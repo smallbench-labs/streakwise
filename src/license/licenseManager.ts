@@ -38,6 +38,8 @@ export class LicenseManager {
 
 	/** Pure, offline check. Safe to call as often as you like. */
 	isPro(): boolean {
+		// Free-only build (no Polar org ID): Pro never unlocks, even from an old cached result.
+		if (!this.isConfigured()) return false;
 		const c = this.cache;
 		if (c.status !== 'valid' || c.lastValidatedAt === null) return false;
 		const t = this.now();
@@ -139,6 +141,8 @@ export class LicenseManager {
 	}
 
 	private async post(path: string, body: Record<string, unknown>): Promise<{ status: number; json: unknown } | 'offline'> {
+		// Defence in depth: a free-only build must never touch the network.
+		if (!this.isConfigured()) return 'offline';
 		try {
 			return await this.http(this.config.apiBase + path, body);
 		} catch {

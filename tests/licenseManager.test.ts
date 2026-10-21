@@ -220,3 +220,27 @@ test('offline during re-activation keeps grace period', async () => {
 	await mgr.refreshIfDue();
 	assert.equal(mgr.isPro(), true);
 });
+
+// --- Free-only v0.1.0: placeholder org id => zero network, Pro never unlocks ---
+test('free-only build (placeholder org id): no fetch/requestUrl/http at all, Pro stays locked', async () => {
+	const http = fakeHttp([granted(), granted()]);
+	const origFetch = globalThis.fetch;
+	let fetchCalls = 0;
+	globalThis.fetch = (async () => { fetchCalls++; throw new Error('fetch must not be called'); }) as typeof fetch;
+	try {
+		// Stale "valid" cache from a hypothetical older build must not unlock Pro either.
+		const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', status: 'valid', lastValidatedAt: T0, lastCheckedAt: 0, activationId: 'a' };
+		const mgr = new LicenseManager(cache, { ...DEFAULT_LICENSE_CONFIG }, http.http, () => T0 + 2 * DAY, async () => {});
+		assert.equal(DEFAULT_LICENSE_CONFIG.organizationId, 'REPLACE_WITH_POLAR_ORG_ID');
+		assert.equal(mgr.isConfigured(), false);
+		assert.equal(mgr.isPro(), false);
+		await mgr.refreshIfDue();
+		await mgr.activate('SOME-KEY', 'Obsidian');
+		await mgr.clear();
+		assert.equal(mgr.isPro(), false);
+		assert.equal(http.calls.length, 0);
+		assert.equal(fetchCalls, 0);
+	} finally {
+		globalThis.fetch = origFetch;
+	}
+});

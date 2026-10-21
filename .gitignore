@@ -38,3 +38,4 @@ xvfb*/
 .profile*/
 profile*/
 *.log
+release/

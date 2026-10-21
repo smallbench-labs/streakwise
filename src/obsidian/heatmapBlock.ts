@@ -44,6 +44,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		}
 
 		const isPro = plugin.license.isPro();
+		const proSoon = !plugin.license.isConfigured();
 		const { config, locked } = applyFreeLimits(parsed, isPro);
 		const today = moment().format('YYYY-MM-DD');
 		const source = resolveDailySource(plugin.app, s);
@@ -63,7 +64,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		if (locked.length) {
 			root.createDiv({
 				cls: 'sw-message sw-locked',
-				text: `${locked.join(', ')}: Streakwise Pro feature. Showing the free yearly view of "${config.habits[0]}".`,
+				text: `${locked.join(', ')}: ${proSoon ? 'Streakwise Pro — coming soon' : 'Streakwise Pro feature'}. Showing the free yearly view of "${config.habits[0]}".`,
 			});
 		}
 
@@ -100,8 +101,8 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		// No export on blocks with config errors or locked features: the image would not match the request.
 		if (parsed.errors.length || locked.length) return;
 		const toolbar = root.createDiv({ cls: 'sw-toolbar' });
-		const exportBtn = toolbar.createEl('button', { text: isPro ? 'Export PNG' : 'Export PNG (Pro)' });
-		exportBtn.setAttr('aria-label', isPro ? 'Export this heatmap as a PNG into your vault' : 'Exporting PNG requires Streakwise Pro');
+		const exportBtn = toolbar.createEl('button', { text: isPro ? 'Export PNG' : proSoon ? 'Export PNG (Pro, coming soon)' : 'Export PNG (Pro)' });
+		exportBtn.setAttr('aria-label', isPro ? 'Export this heatmap as a PNG into your vault' : proSoon ? 'PNG export is a Streakwise Pro feature, coming soon' : 'Exporting PNG requires Streakwise Pro');
 		exportBtn.disabled = !isPro;
 		exportBtn.onclick = () => { void this.exportPng(config.view, today); };
 	}

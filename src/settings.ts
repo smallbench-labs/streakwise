@@ -85,7 +85,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			});
 		new Setting(containerEl)
 			.setName('PNG export folder')
-			.setDesc('Pro. Exported images are saved inside your vault.')
+			.setDesc(this.plugin.license.isConfigured() ? 'Pro. Exported images are saved inside your vault.' : 'Pro (coming soon). Exported images are saved inside your vault.')
 			.addText((t) => t.setValue(s.exportFolder)
 				.onChange((v) => { void this.update((x) => { x.exportFolder = v.trim(); }); }));
 
@@ -95,6 +95,15 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 
 	private displayLicense(containerEl: HTMLElement) {
 		const lic = this.plugin.license;
+		if (!lic.isConfigured()) {
+			// Free-only build: no key field, no purchase link, no network.
+			new Setting(containerEl).setName('Pro').setHeading();
+			new Setting(containerEl)
+				.setName('Streakwise Pro — coming soon')
+				.setDesc('Free version: yearly heatmap of one habit. Pro features (month, week, quarter and '
+					+ 'year-to-date views, multiple habits and PNG export) are coming soon.');
+			return;
+		}
 		this.keyDraft = lic.state.key;
 		new Setting(containerEl).setName('Pro license').setHeading();
 		const status = lic.isPro()
