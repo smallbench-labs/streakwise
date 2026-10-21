@@ -28,7 +28,8 @@ function setup(responses: Parameters<typeof fakeHttp>[0], opts: Partial<LicenseC
 	return { mgr, calls, saved, advance: (ms: number) => { now += ms; } };
 }
 
-const granted = (extra: Record<string, unknown> = {}) => ({ status: 200, json: { status: 'granted', expires_at: null, ...extra } });
+const BENEFIT = DEFAULT_LICENSE_CONFIG.benefitId;
+const granted = (extra: Record<string, unknown> = {}) => ({ status: 200, json: { id: 'lk-1', status: 'granted', organization_id: ORG, benefit_id: BENEFIT, expires_at: null, ...extra } });
 
 test('no key: isPro false and no network on refresh', async () => {
 	const { mgr, calls } = setup([]);
@@ -251,3 +252,84 @@ test('v0.2 default config: real Polar org id, portal, 5-device activations', () 
 	const mgr = new LicenseManager({ ...EMPTY_LICENSE }, { ...DEFAULT_LICENSE_CONFIG }, async () => { throw new Error('no'); }, () => T0, async () => {});
 	assert.equal(mgr.isConfigured(), true);
 });
+
+// ---- v0.2 Pro: strict Polar validate checks (mocked production-shaped responses) ----
+test('v0.2 production product + benefit ids are wired', () => {
+	assert.equal(DEFAULT_LICENSE_CONFIG.productId, '3e788897-c49f-4314-84f5-bffe07edec6f');
+	assert.equal(DEFAULT_LICENSE_CONFIG.benefitId, '5ec5a70e-bb98-4923-b040-5c5679f9daa8');
+	assert.equal(DEFAULT_LICENSE_CONFIG.apiBase, 'https://api.polar.sh');
+});
+
+test('strict: valid granted key with our org + benefit unlocks Pro', async () => {
+	const { mgr } = setup([granted({ expires_at: new Date(T0 + 30 * DAY).toISOString() })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), true);
+	assert.equal(mgr.state.status, 'valid');
+});
+
+test('strict: wrong benefit id is not Pro', async () => {
+	const { mgr } = setup([granted({ benefit_id: '00000000-0000-4000-8000-000000000000' })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), false);
+	assert.equal(mgr.state.status, 'invalid');
+});
+
+test('strict: missing benefit id is not Pro', async () => {
+	const { mgr } = setup([granted({ benefit_id: undefined })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), false);
+});
+
+for (const st of ['revoked', 'disabled']) {
+	test(`strict: ${st} key (200 body) is not Pro, and locks a previously valid key`, async () => {
+		const { mgr, advance } = setup([granted(), granted({ status: st })]);
+		await mgr.activate('KEY', 'x');
+		assert.equal(mgr.isPro(), true);
+		advance(DAY);
+		await mgr.refreshIfDue();
+		assert.equal(mgr.isPro(), false);
+		assert.equal(mgr.state.status, 'invalid');
+	});
+}
+
+test('strict: already-expired key is not Pro even if granted', async () => {
+	const { mgr } = setup([granted({ expires_at: new Date(T0 - DAY).toISOString() })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), false);
+	assert.equal(mgr.state.status, 'invalid');
+});
+
+test('strict: wrong org id is not Pro', async () => {
+	const { mgr } = setup([granted({ organization_id: '99999999-2222-4333-8444-555555555555' })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), false);
+	assert.equal(mgr.state.status, 'invalid');
+});
+
+test('strict: network failure after valid keeps 7-day grace, then locks', async () => {
+	const { mgr, advance } = setup([granted(), 'throw', 'throw']);
+	await mgr.activate('KEY', 'x');
+	advance(2 * DAY);
+	await mgr.refreshIfDue();
+	assert.equal(mgr.isPro(), true);
+	assert.equal(mgr.state.status, 'valid');
+	advance(5 * DAY + 1);
+	await mgr.refreshIfDue();
+	assert.equal(mgr.isPro(), false);
+});
+
+for (const [name, json] of [
+	['null body', null],
+	['string body', 'granted'],
+	['array body', [{ status: 'granted' }]],
+	['no status', { organization_id: ORG, benefit_id: BENEFIT }],
+	['bad expires_at', { status: 'granted', organization_id: ORG, benefit_id: BENEFIT, expires_at: 'not-a-date' }],
+	['numeric expires_at', { status: 'granted', organization_id: ORG, benefit_id: BENEFIT, expires_at: 12345 }],
+] as Array<[string, unknown]>) {
+	test(`strict: malformed response (${name}) is not Pro`, async () => {
+		const { mgr } = setup([{ status: 200, json }]);
+		await mgr.activate('KEY', 'x');
+		assert.equal(mgr.isPro(), false);
+		assert.equal(mgr.state.status, 'invalid');
+	});
+}

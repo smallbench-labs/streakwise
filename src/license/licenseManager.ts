@@ -4,6 +4,8 @@ const DAY = 24 * 60 * 60 * 1000;
 
 export const DEFAULT_LICENSE_CONFIG: LicenseConfig = {
 	organizationId: '189678f8-c892-4af0-8586-0bf2a6873e02',
+	productId: '3e788897-c49f-4314-84f5-bffe07edec6f', // Streakwise Pro (production)
+	benefitId: '5ec5a70e-bb98-4923-b040-5c5679f9daa8', // Streakwise license-key benefit (production)
 	useActivations: true, // Polar benefit: 5 activations per key, keys never expire
 	portalUrl: 'https://polar.sh/formchime/portal',
 	apiBase: 'https://api.polar.sh',
@@ -126,18 +128,34 @@ export class LicenseManager {
 		}
 		if (res.status !== 200) return this.markInvalid(res.status);
 
-		const data = res.json as { status?: unknown; expires_at?: unknown };
-		if (data.status !== 'granted') return this.markInvalid(res.status);
-		const expiresAt = typeof data.expires_at === 'string' ? Date.parse(data.expires_at) : null;
+		const verdict = this.checkGrant(res.json);
+		if (verdict === null) return this.markInvalid(res.status);
 		const t = this.now();
+		if (verdict.expiresAt !== null && t >= verdict.expiresAt) return this.markInvalid(res.status);
 		return this.update({
 			...this.cache,
 			status: 'valid',
 			lastValidatedAt: t,
 			lastCheckedAt: t,
-			expiresAt: Number.isNaN(expiresAt) ? null : expiresAt,
+			expiresAt: verdict.expiresAt,
 			message: 'License valid. Pro features unlocked.',
 		});
+	}
+
+	/**
+	 * Strict check of a 200 validate body. Returns null (not Pro) unless the key is granted,
+	 * belongs to our org, carries our benefit, and has a parseable (or null) expiry.
+	 */
+	private checkGrant(json: unknown): { expiresAt: number | null } | null {
+		if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+		const data = json as { status?: unknown; organization_id?: unknown; benefit_id?: unknown; expires_at?: unknown };
+		if (data.status !== 'granted') return null;
+		if (data.organization_id !== this.config.organizationId) return null;
+		if (data.benefit_id !== this.config.benefitId) return null;
+		if (data.expires_at === null || data.expires_at === undefined) return { expiresAt: null };
+		if (typeof data.expires_at !== 'string') return null;
+		const expiresAt = Date.parse(data.expires_at);
+		return Number.isNaN(expiresAt) ? null : { expiresAt };
 	}
 
 	private async post(path: string, body: Record<string, unknown>): Promise<{ status: number; json: unknown } | 'offline'> {

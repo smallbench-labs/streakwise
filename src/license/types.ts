@@ -42,6 +42,10 @@ export const EMPTY_LICENSE: LicenseCache = {
 export interface LicenseConfig {
 	/** Polar organization id (public, safe to ship). Placeholder until Roger creates the product. */
 	organizationId: string;
+	/** Polar product id for Streakwise Pro (informational; checkout goes through the gate). */
+	productId: string;
+	/** Polar license-key benefit id. A key without exactly this benefit never unlocks Pro. */
+	benefitId: string;
 	/** Set true only if the Polar license benefit has device activations enabled. */
 	useActivations: boolean;
 	/** Polar customer portal, shown when the activation limit is reached. */

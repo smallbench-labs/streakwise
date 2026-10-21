@@ -31,6 +31,26 @@ jobs:
             exit 1
           fi
 
+      - name: package.json, package-lock.json and versions.json must match tag and manifest (QA W-1)
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          node -e '
+            const fs = require("fs");
+            const tag = process.argv[1];
+            const m = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const l = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            const v = JSON.parse(fs.readFileSync("versions.json", "utf8"));
+            const errs = [];
+            if (p.version !== tag) errs.push(`package.json version ${p.version} != tag ${tag}`);
+            if (p.version !== m.version) errs.push(`package.json version ${p.version} != manifest ${m.version}`);
+            if (l.version !== tag || (l.packages && l.packages[""] && l.packages[""].version !== tag)) errs.push(`package-lock.json version does not match tag ${tag}`);
+            if (!(tag in v)) errs.push(`versions.json has no entry for ${tag}`);
+            else if (v[tag] !== m.minAppVersion) errs.push(`versions.json[${tag}]=${v[tag]} != manifest minAppVersion ${m.minAppVersion}`);
+            if (errs.length) { for (const e of errs) console.log(`::error::${e}`); process.exit(1); }
+            console.log(`Versions consistent: ${tag}`);
+          ' "$TAG"
+
       - run: npm ci
       - run: npm run build
       - run: npm test
