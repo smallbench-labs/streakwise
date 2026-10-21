@@ -4,7 +4,7 @@ import { applyFreeLimits, parseBlockConfig } from '../core/blockConfig';
 import { buildHeatmapModel } from '../core/heatmapModel';
 import { duplicatesInRange } from '../core/dailyEntries';
 import { habitValues, resolveDailySource } from './dataSource';
-import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderStats } from './renderSvg';
+import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderStats, renderWeekdayAxis } from './renderSvg';
 import type { HeatmapModel } from '../core/heatmapModel';
 import type { Palette } from '../core/blockConfig';
 import { savePngToVault, svgToPng } from './exportPng';
@@ -78,8 +78,9 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			const what = locked.join(' and ');
 			const verb = locked.length > 1 ? 'are' : 'is';
 			callout.createSpan({
-				text: `${what} ${verb} ${proSoon ? 'a Pro feature (coming soon)' : 'a Streakwise Pro feature'}. `
-					+ 'The free version shows one habit per block with "view: year".',
+				text: proSoon
+					? `${what} ${verb} planned for Pro. In the free version, use one habit with "view: year".`
+					: `${what} ${verb} a Streakwise Pro feature. In the free version, use one habit with "view: year".`,
 			});
 			return;
 		}
@@ -105,7 +106,11 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		if (config.title) root.createDiv({ cls: 'sw-title', text: config.title });
 		for (const habit of model.habits) {
 			renderStats(root, habit);
-			const scroll = root.createDiv({ cls: 'sw-scroll' });
+			// Weekday labels stay put; only the cells (and month labels) scroll.
+			const row = root.createDiv({ cls: 'sw-grid-row' });
+			const axis = renderWeekdayAxis(model);
+			if (axis) row.appendChild(axis);
+			const scroll = row.createDiv({ cls: 'sw-scroll' });
 			scroll.appendChild(renderGridSvg(model, habit, palette));
 			this.scrollToToday(scroll, today);
 		}
@@ -136,30 +141,53 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		}
 		const card = root.createDiv({ cls: 'sw-empty-card' });
 		card.createDiv({ cls: 'sw-empty-title', text: 'No daily notes found yet' });
-		card.createDiv({
-			cls: 'sw-empty-desc',
-			text: `Streakwise looks in "${folder || '/'}" and its subfolders for notes named like ${format}. Create a daily note, or change the location in settings.`,
-		});
+		const desc = card.createDiv({ cls: 'sw-empty-desc' });
+		desc.appendText('Streakwise looks in ');
+		if (folder) {
+			desc.appendText('the folder ');
+			desc.createEl('code', { text: folder });
+		} else desc.appendText('your vault root');
+		desc.appendText(' and its subfolders for notes named like ');
+		desc.createEl('code', { text: format });
+		desc.appendText('. Create a daily note, or change the location in settings.');
 		const btn = card.createEl('button', { text: 'Open Streakwise settings' });
 		btn.onclick = () => { this.plugin.openSettings(); };
 	}
 
-	/** Narrow panes: right-align today's column and show fades on edges that can scroll. */
+	/**
+	 * Narrow panes: right-align today's column and show fades on edges that can scroll.
+	 * Re-aligns when the pane is resized, unless the user has scrolled the grid themselves.
+	 */
 	private scrollToToday(scroll: HTMLElement, today: string) {
+		let userScrolled = false;
+		let ours = false;
 		const update = () => {
 			const max = scroll.scrollWidth - scroll.clientWidth;
 			scroll.toggleClass('sw-fade-left', scroll.scrollLeft > 1);
 			scroll.toggleClass('sw-fade-right', scroll.scrollLeft < max - 1);
 		};
-		scroll.addEventListener('scroll', update, { passive: true });
-		window.requestAnimationFrame(() => {
+		const align = () => {
 			const cell = scroll.querySelector(`rect[data-day="${today}"]`);
 			if (cell && scroll.scrollWidth > scroll.clientWidth) {
 				const c = cell.getBoundingClientRect(), b = scroll.getBoundingClientRect();
-				scroll.scrollLeft += c.right - b.right + 16;
+				ours = true;
+				scroll.scrollLeft += c.right - b.right + 40; // keep today clear of the 24px edge fade
 			}
 			update();
+		};
+		scroll.addEventListener('scroll', () => {
+			if (ours) ours = false; else userScrolled = true;
+			update();
+		}, { passive: true });
+		let lastWidth = 0;
+		const ro = new ResizeObserver(() => {
+			if (scroll.clientWidth === lastWidth) return;
+			lastWidth = scroll.clientWidth;
+			if (userScrolled) update(); else align();
 		});
+		ro.observe(scroll);
+		this.register(() => ro.disconnect());
+		window.requestAnimationFrame(align);
 	}
 
 	async exportPng(view: string, today: string): Promise<string | null> {

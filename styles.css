@@ -2,11 +2,14 @@
    Sequential ramps: lightness changes with the level, so levels do not rely on hue alone. */
 
 .sw-block { margin: var(--size-4-2) 0; container-type: inline-size; }
-.sw-scroll { overflow-x: auto; font-size: var(--font-ui-small); }
-/* Edge fades show that the grid can scroll (set by heatmapBlock.scrollToToday). */
-.sw-scroll.sw-fade-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
-.sw-scroll.sw-fade-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent); }
-.sw-scroll.sw-fade-left.sw-fade-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.sw-grid-row { display: flex; align-items: flex-start; font-size: var(--font-ui-small); }
+.sw-weekday-axis { flex: none; }
+.sw-scroll { overflow-x: auto; min-width: 0; flex: 1 1 auto; font-size: var(--font-ui-small); }
+/* Edge fades show that the grid can scroll (set by heatmapBlock.scrollToToday). Only the cell rows fade;
+   the month-label strip (top 14 SVG units = 1.08em) stays unmasked so labels are clipped, not half-faded. */
+.sw-scroll.sw-fade-right { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
+.sw-scroll.sw-fade-left { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to left, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to left, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
+.sw-scroll.sw-fade-left.sw-fade-right { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
 .sw-svg { display: block; font-family: var(--font-interface); }
 /* On-screen SVGs are sized in em of --font-ui-small, so cells and labels follow Obsidian's font size. */
 .sw-svg.sw-scaled { width: var(--sw-w); height: var(--sw-h); }
@@ -28,15 +31,27 @@
 
 /* S-12: every filled level has >= 3:1 contrast against the default light (#ffffff) and dark (#1e1e1e)
    backgrounds; --sw-on-N is the day-number colour for that level (>= 4.5:1). Checked by tests/contrast.test.ts. */
-/* Accent (default): follows the theme's --interactive-accent. Level 1 is the accent itself; higher levels mix in
-   --text-normal, so they get darker in light themes and brighter in dark themes. Checked by tests/contrast.test.ts
-   with Obsidian's default accent. */
+/* Accent (default): the theme's accent hue and chroma at a fixed OKLCH lightness ladder, so every level keeps its
+   colour and the steps are even in any theme (also low-chroma accents like Minimal's grey: they become a grey ladder).
+   Light themes get darker with the value, dark themes brighter. The color-mix lines are a fallback for older
+   Chromium without relative colour syntax. Checked by tests/contrast.test.ts (>= 3:1 vs background, adjacent >= 1.35:1). */
 .sw-palette-accent {
 	--sw-1: var(--interactive-accent);
 	--sw-2: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal));
 	--sw-3: color-mix(in srgb, var(--interactive-accent) 60%, var(--text-normal));
 	--sw-4: color-mix(in srgb, var(--interactive-accent) 40%, var(--text-normal));
-	--sw-on-1: var(--text-on-accent); --sw-on-2: var(--background-primary); --sw-on-3: var(--background-primary); --sw-on-4: var(--background-primary);
+	--sw-1: oklch(from var(--interactive-accent) 0.60 c h);
+	--sw-2: oklch(from var(--interactive-accent) 0.50 c h);
+	--sw-3: oklch(from var(--interactive-accent) 0.40 c h);
+	--sw-4: oklch(from var(--interactive-accent) 0.30 c h);
+	--sw-on-1: #ffffff; --sw-on-2: #ffffff; --sw-on-3: #ffffff; --sw-on-4: #ffffff;
+}
+.theme-dark .sw-palette-accent {
+	--sw-1: oklch(from var(--interactive-accent) 0.58 c h);
+	--sw-2: oklch(from var(--interactive-accent) 0.69 c h);
+	--sw-3: oklch(from var(--interactive-accent) 0.80 c h);
+	--sw-4: oklch(from var(--interactive-accent) 0.91 c h);
+	--sw-on-1: #ffffff; --sw-on-2: #000000; --sw-on-3: #000000; --sw-on-4: #000000;
 }
 .sw-palette-green { --sw-1: #4c9c61; --sw-on-1: #000000; --sw-2: #2f7f47; --sw-on-2: #ffffff; --sw-3: #1c6332; --sw-on-3: #ffffff; --sw-4: #0b4520; --sw-on-4: #ffffff; }
 .sw-palette-blue { --sw-1: #5b8fc7; --sw-on-1: #000000; --sw-2: #3b70b0; --sw-on-2: #ffffff; --sw-3: #235390; --sw-on-3: #ffffff; --sw-4: #0d3366; --sw-on-4: #ffffff; }
