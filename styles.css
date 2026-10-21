@@ -1,0 +1,51 @@
+/* Streakwise: theme-aware heatmap colours. Level 0 = not done; 1..4 = increasing intensity.
+   Sequential ramps: lightness changes with the level, so levels do not rely on hue alone. */
+
+.sw-block { margin: 0.5em 0; }
+.sw-scroll { overflow-x: auto; }
+.sw-svg { display: block; font-family: var(--font-interface); }
+.sw-svg-title { font-size: 14px; font-weight: 600; fill: var(--text-normal); }
+.sw-svg-stats { font-size: 12px; fill: var(--text-normal); }
+.sw-axis { font-size: 9px; fill: var(--text-muted); }
+.sw-daynum { font-size: 11px; fill: var(--text-normal); pointer-events: none; }
+.sw-daynum.sw-on-l1 { fill: var(--sw-on-1); }
+.sw-daynum.sw-on-l2 { fill: var(--sw-on-2); }
+.sw-daynum.sw-on-l3 { fill: var(--sw-on-3); }
+.sw-daynum.sw-on-l4 { fill: var(--sw-on-4); }
+
+.sw-cell { stroke: none; }
+/* S-12/S-16: empty cells get an opaque --text-muted border (~3:1+ on #1e1e1e) so they stay visible on any background. */
+.sw-cell.sw-l0 { fill: var(--background-secondary); stroke: var(--text-muted); stroke-width: 1; }
+.sw-cell.sw-nodata { fill: var(--background-primary); stroke-dasharray: 2 1.5; }
+.sw-cell.sw-future { opacity: 0.3; }
+
+/* S-12: every filled level has >= 3:1 contrast against the default light (#ffffff) and dark (#1e1e1e)
+   backgrounds; --sw-on-N is the day-number colour for that level (>= 4.5:1). Checked by tests/contrast.test.ts. */
+.sw-palette-green { --sw-1: #4c9c61; --sw-on-1: #000000; --sw-2: #2f7f47; --sw-on-2: #ffffff; --sw-3: #1c6332; --sw-on-3: #ffffff; --sw-4: #0b4520; --sw-on-4: #ffffff; }
+.sw-palette-blue { --sw-1: #5b8fc7; --sw-on-1: #000000; --sw-2: #3b70b0; --sw-on-2: #ffffff; --sw-3: #235390; --sw-on-3: #ffffff; --sw-4: #0d3366; --sw-on-4: #ffffff; }
+.sw-palette-purple { --sw-1: #9079c4; --sw-on-1: #000000; --sw-2: #7459ad; --sw-on-2: #ffffff; --sw-3: #583d93; --sw-on-3: #ffffff; --sw-4: #3a1f70; --sw-on-4: #ffffff; }
+.sw-palette-orange { --sw-1: #d0711f; --sw-on-1: #000000; --sw-2: #b05612; --sw-on-2: #ffffff; --sw-3: #8a3e09; --sw-on-3: #ffffff; --sw-4: #5e2603; --sw-on-4: #ffffff; }
+.theme-dark .sw-palette-green { --sw-1: #2f7d45; --sw-on-1: #ffffff; --sw-2: #3fa55a; --sw-on-2: #000000; --sw-3: #5cc977; --sw-on-3: #000000; --sw-4: #8be6a0; --sw-on-4: #000000; }
+.theme-dark .sw-palette-blue { --sw-1: #3a6ea8; --sw-on-1: #ffffff; --sw-2: #4d8fd6; --sw-on-2: #000000; --sw-3: #79b0eb; --sw-on-3: #000000; --sw-4: #b0d3ff; --sw-on-4: #000000; }
+.theme-dark .sw-palette-purple { --sw-1: #7458b8; --sw-on-1: #ffffff; --sw-2: #9277d6; --sw-on-2: #000000; --sw-3: #b39cf0; --sw-on-3: #000000; --sw-4: #d6c8ff; --sw-on-4: #000000; }
+.theme-dark .sw-palette-orange { --sw-1: #a85a1c; --sw-on-1: #ffffff; --sw-2: #d0772e; --sw-on-2: #000000; --sw-3: #f09a50; --sw-on-3: #000000; --sw-4: #ffc48a; --sw-on-4: #000000; }
+
+.sw-cell.sw-l1 { fill: var(--sw-1); }
+.sw-cell.sw-l2 { fill: var(--sw-2); }
+.sw-cell.sw-l3 { fill: var(--sw-3); }
+.sw-cell.sw-l4 { fill: var(--sw-4); }
+
+.sw-title { font-weight: 600; font-size: var(--font-ui-medium); overflow-wrap: anywhere; margin-bottom: 0.2em; }
+.sw-stats { font-size: var(--font-ui-small); overflow-wrap: anywhere; margin-top: 0.3em; }
+.sw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: 0.2em; }
+.sw-legend svg { flex: none; }
+.sw-legend span { white-space: nowrap; padding: 0 2px; }
+.sw-message { font-size: var(--font-ui-small); color: var(--text-muted); margin-bottom: 0.4em; }
+.sw-message.sw-error { color: var(--text-error); }
+.sw-message.sw-locked { color: var(--text-accent); }
+.sw-toolbar { margin-top: 0.4em; }
+
+@media (forced-colors: active) {
+	.sw-cell { stroke: CanvasText; }
+}
+.sw-export-holder { position: absolute; left: -10000px; top: 0; visibility: hidden; }
