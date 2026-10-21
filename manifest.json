@@ -1,7 +1,7 @@
 {
 	"id": "streakwise",
 	"name": "Streakwise",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"minAppVersion": "1.5.0",
 	"description": "A habit heatmap and streak tracker for your daily notes.",
 	"author": "Smallbench Labs",

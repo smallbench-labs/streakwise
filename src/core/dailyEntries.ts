@@ -68,3 +68,8 @@ export function matchDailyNote(path: string, folder: string, parse: (s: string) 
 export function duplicatesInRange(dups: DedupedEntries['duplicates'], range: DateRange): DedupedEntries['duplicates'] {
 	return dups.filter((d) => daysBetween(range.start, d.day) >= 0 && daysBetween(d.day, range.end) >= 0);
 }
+
+/** True if a vault path is inside the daily-notes folder (any path, for the vault root). */
+export function isInDailyFolder(path: string, folder: string): boolean {
+	return !folder || path === folder || path.startsWith(folder + '/');
+}

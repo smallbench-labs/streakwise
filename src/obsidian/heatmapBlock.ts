@@ -4,6 +4,7 @@ import { applyFreeLimits, parseBlockConfig } from '../core/blockConfig';
 import { buildHeatmapModel } from '../core/heatmapModel';
 import { duplicatesInRange } from '../core/dailyEntries';
 import { habitValues, resolveDailySource } from './dataSource';
+import { formatDailyNoteName } from '../core/noteDates';
 import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderStats, renderWeekdayAxis } from './renderSvg';
 import type { HeatmapModel } from '../core/heatmapModel';
 import type { Palette } from '../core/blockConfig';
@@ -110,7 +111,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			const row = root.createDiv({ cls: 'sw-grid-row' });
 			const axis = renderWeekdayAxis(model);
 			if (axis) row.appendChild(axis);
-			const scroll = row.createDiv({ cls: 'sw-scroll' });
+			const scroll = row.createDiv({ cls: 'sw-scroll-wrap' }).createDiv({ cls: 'sw-scroll' });
 			scroll.appendChild(renderGridSvg(model, habit, palette));
 			this.scrollToToday(scroll, today);
 		}
@@ -148,7 +149,8 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			desc.createEl('code', { text: folder });
 		} else desc.appendText('your vault root');
 		desc.appendText(' and its subfolders for notes named like ');
-		desc.createEl('code', { text: format });
+		desc.createEl('code', { text: formatDailyNoteName(moment().format('YYYY-MM-DD'), format) });
+		desc.appendText(` (format ${format})`);
 		desc.appendText('. Create a daily note, or change the location in settings.');
 		const btn = card.createEl('button', { text: 'Open Streakwise settings' });
 		btn.onclick = () => { this.plugin.openSettings(); };
@@ -163,8 +165,9 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		let ours = false;
 		const update = () => {
 			const max = scroll.scrollWidth - scroll.clientWidth;
-			scroll.toggleClass('sw-fade-left', scroll.scrollLeft > 1);
-			scroll.toggleClass('sw-fade-right', scroll.scrollLeft < max - 1);
+			const wrap = scroll.parentElement;
+			wrap?.toggleClass('sw-fade-left', scroll.scrollLeft > 1);
+			wrap?.toggleClass('sw-fade-right', scroll.scrollLeft < max - 1);
 		};
 		const align = () => {
 			const cell = scroll.querySelector(`rect[data-day="${today}"]`);

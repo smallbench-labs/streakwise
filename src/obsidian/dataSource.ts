@@ -1,4 +1,4 @@
-import { App, moment } from 'obsidian';
+import { App, TFile, TFolder, moment } from 'obsidian';
 import { DayKey } from '../core/dates';
 import { readHabit } from '../core/values';
 import { parseDailyNoteDate } from '../core/noteDates';
@@ -72,7 +72,7 @@ export class DailyNoteIndex {
 		const key = `${source.folder}\n${source.format}`;
 		if (this.cached?.key === key) return this.cached.result;
 		const entries: DailyEntry[] = [];
-		for (const file of this.app.vault.getMarkdownFiles()) {
+		for (const file of markdownFilesIn(this.app, source.folder)) {
 			const day = dailyNoteDate(file.path, source);
 			if (!day) continue;
 			entries.push({ path: file.path, day, frontmatter: this.app.metadataCache.getFileCache(file)?.frontmatter });
@@ -82,6 +82,27 @@ export class DailyNoteIndex {
 		return result;
 	}
 }
+
+/**
+ * Markdown files in the daily-notes folder and its subfolders only (no whole-vault scan).
+ * An empty folder setting means the vault root, which is still just that folder tree.
+ */
+export function markdownFilesIn(app: App, folder: string): TFile[] {
+	const start = folder ? app.vault.getAbstractFileByPath(folder) : app.vault.getRoot();
+	if (!(start instanceof TFolder)) return [];
+	const out: TFile[] = [];
+	const stack: TFolder[] = [start];
+	let dir: TFolder | undefined;
+	while ((dir = stack.pop()) !== undefined) {
+		for (const child of dir.children) {
+			if (child instanceof TFolder) stack.push(child);
+			else if (child instanceof TFile && child.extension === 'md') out.push(child);
+		}
+	}
+	return out;
+}
+
+export { isInDailyFolder } from '../core/dailyEntries';
 
 /** habit -> (day -> value) */
 export function habitValues(index: DedupedEntries, habits: string[]): Map<string, Map<DayKey, number>> {
