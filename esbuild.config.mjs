@@ -37,6 +37,8 @@ const context = await esbuild.context({
 	logLevel: 'info',
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
+	// v0.1.x is free-only: strip all license / Polar / network code from main.js.
+	define: { FREE_BUILD: 'true' },
 	outfile: 'main.js',
 	minify: prod,
 });
