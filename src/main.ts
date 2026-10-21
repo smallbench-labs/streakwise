@@ -1,11 +1,11 @@
-import { Editor, Plugin, debounce } from 'obsidian';
+import { Editor, Plugin, TAbstractFile, debounce } from 'obsidian';
 import { DEFAULT_SETTINGS, StreakwiseSettingTab, StreakwiseSettings } from './settings';
 import { LicenseManager, DEFAULT_LICENSE_CONFIG } from './license/licenseManager';
 import { obsidianHttpPost } from './license/obsidianHttp';
 import { KeyStore, selectKeyStore } from './license/keyStore';
 import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
-import { DailyNoteIndex } from './obsidian/dataSource';
+import { DailyNoteIndex, isInDailyFolder, resolveDailySource } from './obsidian/dataSource';
 import { sanitizeSettings } from './core/settingsSanitize';
 
 export const BLOCK_LANGUAGE = 'streakwise';
@@ -25,10 +25,13 @@ export default class StreakwisePlugin extends Plugin {
 
 		// Any change that can affect which notes are daily notes or their values (S-01: includes rename).
 		const notesChanged = debounce(() => { this.dailyIndex.invalidate(); this.refreshBlocks(); }, 500, true);
-		this.registerEvent(this.app.metadataCache.on('changed', notesChanged));
-		this.registerEvent(this.app.vault.on('create', notesChanged));
-		this.registerEvent(this.app.vault.on('delete', notesChanged));
-		this.registerEvent(this.app.vault.on('rename', notesChanged));
+		// Only files inside the daily-notes folder matter; for rename, either the old or the new path.
+		const inFolder = (path: string) => isInDailyFolder(path, resolveDailySource(this.app, this.settings).folder);
+		const onFile = (file: TAbstractFile) => { if (inFolder(file.path)) notesChanged(); };
+		this.registerEvent(this.app.metadataCache.on('changed', (file) => onFile(file)));
+		this.registerEvent(this.app.vault.on('create', onFile));
+		this.registerEvent(this.app.vault.on('delete', onFile));
+		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => { if (inFolder(file.path) || inFolder(oldPath)) notesChanged(); }));
 
 		// FREE_BUILD (v0.1.x): esbuild drops the license/HTTP code entirely; Pro never unlocks.
 		this.license = FREE_BUILD ? FREE_LICENSE : new LicenseManager(

@@ -4,12 +4,18 @@
 .sw-block { margin: var(--size-4-2) 0; container-type: inline-size; }
 .sw-grid-row { display: flex; align-items: flex-start; font-size: var(--font-ui-small); }
 .sw-weekday-axis { flex: none; }
-.sw-scroll { overflow-x: auto; min-width: 0; flex: 1 1 auto; font-size: var(--font-ui-small); }
-/* Edge fades show that the grid can scroll (set by heatmapBlock.scrollToToday). Only the cell rows fade;
-   the month-label strip (top 14 SVG units = 1.08em) stays unmasked so labels are clipped, not half-faded. */
-.sw-scroll.sw-fade-right { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
-.sw-scroll.sw-fade-left { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to left, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to left, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
-.sw-scroll.sw-fade-left.sw-fade-right { -webkit-mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; mask: linear-gradient(#000, #000) top / 100% 1.08em no-repeat, linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent) 0 1.08em / 100% 100% no-repeat; }
+.sw-scroll { overflow-x: auto; font-size: var(--font-ui-small); }
+/* Edge fades show that the grid can scroll (classes set by heatmapBlock.scrollToToday). They are overlays on a
+   non-scrolling wrapper around .sw-scroll (not a CSS mask): --background-primary to transparent, 24px wide,
+   below the month-label strip (1.08em), never over the weekday column, and click-through. */
+.sw-scroll-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+.sw-scroll-wrap::before, .sw-scroll-wrap::after {
+	content: ''; position: absolute; top: 1.08em; bottom: 0; width: 24px;
+	pointer-events: none; opacity: 0; transition: opacity 120ms ease;
+}
+.sw-scroll-wrap::before { left: 0; background: linear-gradient(to right, var(--background-primary), transparent); }
+.sw-scroll-wrap::after { right: 0; background: linear-gradient(to left, var(--background-primary), transparent); }
+.sw-scroll-wrap.sw-fade-left::before, .sw-scroll-wrap.sw-fade-right::after { opacity: 1; }
 .sw-svg { display: block; font-family: var(--font-interface); }
 /* On-screen SVGs are sized in em of --font-ui-small, so cells and labels follow Obsidian's font size. */
 .sw-svg.sw-scaled { width: var(--sw-w); height: var(--sw-h); }

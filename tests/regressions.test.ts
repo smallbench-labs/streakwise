@@ -94,3 +94,25 @@ test('S-14: duplicate notice only for days inside the block range', () => {
 	assert.deepEqual(duplicatesInRange(dups, { start: '2026-04-01', end: '2026-04-30' }), []);
 	assert.equal(duplicatesInRange(dups, { start: '2026-01-01', end: '2026-12-31' }).length, 2);
 });
+
+import { formatDailyNoteName } from '../src/core/noteDates';
+import { isInDailyFolder } from '../src/core/dailyEntries';
+
+test('S-29: [literal] text in date formats is matched and shown without brackets', () => {
+	assert.equal(parseDailyNoteDate('none 2026-10-21', '[none] YYYY-MM-DD'), '2026-10-21');
+	assert.equal(parseDailyNoteDate('[none] 2026-10-21', '[none] YYYY-MM-DD'), null);
+	assert.equal(parseDailyNoteDate('2026/W43 Wed 2026-10-21', 'YYYY/[W43] ddd YYYY-MM-DD'), '2026-10-21');
+	assert.equal(formatDailyNoteName('2026-10-21', '[none]'), 'none');
+	assert.equal(formatDailyNoteName('2026-10-21', '[Journal] YYYY-MM-DD'), 'Journal 2026-10-21');
+	assert.equal(formatDailyNoteName('2026-10-21', 'YYYY/MM/YYYY-MM-DD'), '2026/10/2026-10-21');
+	assert.equal(formatDailyNoteName('2026-10-21', 'dddd, MMMM Do YYYY'), 'Wednesday, October 21st 2026');
+	assert.equal(formatDailyNoteName('2026-10-21', '[YYYY-MM-DD]'), 'YYYY-MM-DD');
+});
+
+test('0.1.1: vault events only count inside the daily-notes folder', () => {
+	assert.equal(isInDailyFolder('Daily/2026/2026-10-21.md', 'Daily'), true);
+	assert.equal(isInDailyFolder('Daily', 'Daily'), true);
+	assert.equal(isInDailyFolder('DailyOld/2026-10-21.md', 'Daily'), false);
+	assert.equal(isInDailyFolder('Projects/x.md', 'Daily'), false);
+	assert.equal(isInDailyFolder('anything.md', ''), true);
+});

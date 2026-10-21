@@ -49,3 +49,33 @@ export function parseDailyNoteDate(pathWithoutExt: string, format: string): DayK
 function escape(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+
+/**
+ * S-29: the note name a Moment-style format produces for `day` (YYYY-MM-DD), for messages.
+ * Text in [brackets] is literal and shown without the brackets, as Moment does.
+ */
+export function formatDailyNoteName(day: DayKey, format: string): string {
+	const [y, mo, d] = day.split('-').map(Number) as [number, number, number];
+	const wd = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return format.replace(/\[([^\]]*)\]|YYYY|YY|MMMM|MMM|MM|M|Do|DD|D|dddd|ddd/g, (t, lit: string | undefined) => {
+		if (lit !== undefined) return lit;
+		switch (t) {
+			case 'YYYY': return String(y);
+			case 'YY': return pad(y % 100);
+			case 'MMMM': return MONTH_NAMES[mo - 1] ?? '';
+			case 'MMM': return (MONTH_NAMES[mo - 1] ?? '').slice(0, 3);
+			case 'MM': return pad(mo);
+			case 'M': return String(mo);
+			case 'Do': return ordinal(d);
+			case 'DD': return pad(d);
+			case 'D': return String(d);
+			case 'dddd': return DAY_NAMES[wd] ?? '';
+			default: return (DAY_NAMES[wd] ?? '').slice(0, 3);
+		}
+	});
+}
