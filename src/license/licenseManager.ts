@@ -13,6 +13,9 @@ export const DEFAULT_LICENSE_CONFIG: LicenseConfig = {
 	recheckIntervalMs: 86_400_000, // 1 day
 };
 
+/** Clock skew tolerated before we treat 'now' as rewound (S-30). */
+export const CLOCK_SKEW_TOLERANCE_MS = 300_000; // 5 minutes
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -44,7 +47,7 @@ export class LicenseManager {
 		if (!this.isConfigured()) return false;
 		const c = this.cache;
 		if (c.status !== 'valid' || c.lastValidatedAt === null) return false;
-		const t = this.now();
+		const t = this.effectiveNow();
 		if (c.expiresAt !== null && t >= c.expiresAt) return false;
 		return t - c.lastValidatedAt <= this.config.gracePeriodMs;
 	}
@@ -52,8 +55,19 @@ export class LicenseManager {
 	/** Days left before Pro locks if we stay offline. 0 when not Pro. */
 	graceDaysLeft(): number {
 		if (!this.isPro() || this.cache.lastValidatedAt === null) return 0;
-		const left = this.cache.lastValidatedAt + this.config.gracePeriodMs - this.now();
+		const left = this.cache.lastValidatedAt + this.config.gracePeriodMs - this.effectiveNow();
 		return Math.max(0, Math.ceil(left / DAY));
+	}
+
+	/** True when the wall clock is behind the latest time we have seen, beyond the tolerance. */
+	clockRewound(): boolean {
+		const seen = Math.max(this.cache.lastSeenAt ?? 0, this.cache.lastCheckedAt ?? 0, this.cache.lastValidatedAt ?? 0);
+		return this.now() < seen - CLOCK_SKEW_TOLERANCE_MS;
+	}
+
+	/** Never earlier than the latest time we have seen, so rewinding the clock cannot extend grace (S-30). */
+	private effectiveNow(): number {
+		return Math.max(this.now(), this.cache.lastSeenAt ?? 0);
 	}
 
 	isConfigured(): boolean {
@@ -89,7 +103,10 @@ export class LicenseManager {
 			label: this.deviceLabel.slice(0, 100) || 'Obsidian',
 		});
 		if (res === 'offline') return this.markOffline();
-		if (res.status !== 200) return this.markInvalid(res.status);
+		if (res.status !== 200) {
+			if (res.status === 404 || res.status === 422 || isPolarNotPermitted(res)) return this.markInvalid(res.status);
+			return this.markOffline(); // 401/403 from a proxy or WAF, 5xx, 429 ... (S-31)
+		}
 		const id = (res.json as { id?: unknown }).id;
 		this.cache.activationId = typeof id === 'string' ? id : null;
 		return null;
@@ -98,6 +115,8 @@ export class LicenseManager {
 	/** Called on plugin load. Re-checks at most once per `recheckIntervalMs`; never if no key. */
 	async refreshIfDue(): Promise<LicenseCache> {
 		if (!this.cache.key || !this.isConfigured()) return this.cache;
+		// Clock moved backwards: treat as a cache miss and revalidate now (S-30).
+		if (this.clockRewound()) return this.validate();
 		const last = this.cache.lastCheckedAt ?? 0;
 		if (this.now() - last < this.config.recheckIntervalMs) return this.cache;
 		return this.validate();
@@ -126,7 +145,10 @@ export class LicenseManager {
 			if (failed) return failed;
 			return this.validate(false);
 		}
-		if (res.status !== 200) return this.markInvalid(res.status);
+		// Only Polar's 404 / 422 are a verdict on the key. 401/403 (proxy, WAF), 5xx, 429 etc.
+		// are transient: keep the cached result under grace (S-31).
+		if (res.status === 404 || res.status === 422) return this.markInvalid(res.status);
+		if (res.status !== 200) return this.markOffline();
 
 		const verdict = this.checkGrant(res.json);
 		if (verdict === null) return this.markInvalid(res.status);
@@ -138,8 +160,9 @@ export class LicenseManager {
 			lastValidatedAt: t,
 			lastCheckedAt: t,
 			expiresAt: verdict.expiresAt,
+			lastSeenAt: t, // Polar just confirmed the key: re-anchor the seen clock to now
 			message: 'License valid. Pro features unlocked.',
-		});
+		}, true);
 	}
 
 	/**
@@ -172,7 +195,7 @@ export class LicenseManager {
 		const pro = this.isPro();
 		return this.update({
 			...this.cache,
-			lastCheckedAt: this.now(),
+			lastCheckedAt: this.effectiveNow(),
 			message: pro
 				? `Could not reach the license server. Pro stays unlocked offline for ${this.graceDaysLeft()} more day(s).`
 				: 'Could not reach the license server. Check your connection and try again.',
@@ -195,9 +218,16 @@ export class LicenseManager {
 		});
 	}
 
-	private async update(next: LicenseCache): Promise<LicenseCache> {
+	private async update(next: LicenseCache, reanchor = false): Promise<LicenseCache> {
+		if (next.key && !reanchor) next = { ...next, lastSeenAt: Math.max(next.lastSeenAt ?? 0, this.now()) };
 		this.cache = next;
 		await this.save(next);
 		return next;
 	}
+}
+
+/** Polar's own activation-limit answer (403 with a NotPermitted JSON body), as opposed to a bare proxy/WAF 403. */
+function isPolarNotPermitted(res: { status: number; json: unknown }): boolean {
+	if (res.status !== 403 || !res.json || typeof res.json !== 'object') return false;
+	return (res.json as { error?: unknown }).error === 'NotPermitted';
 }

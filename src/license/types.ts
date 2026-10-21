@@ -23,6 +23,8 @@ export interface LicenseCache {
 	lastValidatedAt: number | null;
 	/** Last time we attempted any check, success or not (ms). */
 	lastCheckedAt: number | null;
+	/** Latest wall-clock time this plugin has observed (ms). Detects the clock moving backwards (S-30). */
+	lastSeenAt?: number | null;
 	/** License expiry from Polar, if any (ms). */
 	expiresAt: number | null;
 	/** Short human-readable message for the settings tab. */
@@ -36,6 +38,7 @@ export const EMPTY_LICENSE: LicenseCache = {
 	lastValidatedAt: null,
 	lastCheckedAt: null,
 	expiresAt: null,
+	lastSeenAt: null,
 	message: '',
 };
 

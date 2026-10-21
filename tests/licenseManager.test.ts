@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LicenseManager, DEFAULT_LICENSE_CONFIG } from '../src/license/licenseManager';
+import { LicenseManager, DEFAULT_LICENSE_CONFIG, CLOCK_SKEW_TOLERANCE_MS } from '../src/license/licenseManager';
 import { EMPTY_LICENSE, HttpPost, LicenseCache, LicenseConfig } from '../src/license/types';
 
 const DAY = 86_400_000;
@@ -206,7 +206,7 @@ test('re-activated id still rejected: validate retried only once', async () => {
 });
 
 test('after limit error, pressing Activate again reserves a fresh slot', async () => {
-	const { mgr } = setup([{ status: 403, json: {} }, act('a2'), granted()], { useActivations: true });
+	const { mgr } = setup([{ status: 403, json: { error: 'NotPermitted' } }, act('a2'), granted()], { useActivations: true });
 	await mgr.activate('KEY', 'x');
 	assert.equal(mgr.isPro(), false);
 	await mgr.activate('KEY', 'x');
@@ -333,3 +333,87 @@ for (const [name, json] of [
 		assert.equal(mgr.state.status, 'invalid');
 	});
 }
+
+// ---- S-30: clock moved backwards ----
+test('S-30: lastSeenAt is persisted', async () => {
+	const { mgr, saved } = setup([granted()]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(saved.at(-1)?.lastSeenAt, T0);
+});
+
+test('S-30: rewound clock forces revalidation (cache miss) even inside recheck interval', async () => {
+	const { mgr, calls, advance } = setup([granted(), granted()]);
+	await mgr.activate('KEY', 'x');
+	advance(-365 * DAY);
+	assert.equal(mgr.clockRewound(), true);
+	await mgr.refreshIfDue();
+	assert.equal(calls.length, 2);
+	assert.equal(mgr.isPro(), true);
+});
+
+test('S-30: small skew within tolerance is not a rewind', async () => {
+	const { mgr, calls, advance } = setup([granted()]);
+	await mgr.activate('KEY', 'x');
+	advance(-CLOCK_SKEW_TOLERANCE_MS + 1000);
+	await mgr.refreshIfDue();
+	assert.equal(calls.length, 1);
+});
+
+test('S-30: rewound + offline -> grace counts from lastSeen, not the rewound clock', async () => {
+	const { mgr, advance } = setup([granted(), 'throw', 'throw', 'throw']);
+	await mgr.activate('KEY', 'x');
+	advance(6 * DAY);
+	await mgr.refreshIfDue(); // offline, lastSeen = T0+6d
+	assert.equal(mgr.isPro(), true);
+	assert.equal(mgr.state.lastSeenAt, T0 + 6 * DAY);
+	advance(-365 * DAY); // user rewinds a year
+	await mgr.refreshIfDue(); // forced revalidation fails offline
+	assert.equal(mgr.isPro(), true); // still within 7d of lastValidated measured at lastSeen
+	assert.equal(mgr.graceDaysLeft(), 1);
+	assert.equal(mgr.state.lastSeenAt, T0 + 6 * DAY);
+	advance(365 * DAY + DAY + 1); // real time passes beyond grace
+	await mgr.refreshIfDue();
+	assert.equal(mgr.isPro(), false);
+});
+
+test('S-30: rewinding below lastValidated cannot extend grace past 7d of seen time', async () => {
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', status: 'valid', lastValidatedAt: T0, lastCheckedAt: T0 + 8 * DAY, lastSeenAt: T0 + 8 * DAY };
+	const { mgr } = setup(['throw'], {}, cache); // now = T0, rewound 8 days
+	assert.equal(mgr.isPro(), false);
+	await mgr.refreshIfDue();
+	assert.equal(mgr.isPro(), false);
+});
+
+// ---- S-31: only Polar verdicts mark a key invalid ----
+for (const status of [401, 403]) {
+	test(`S-31: validate ${status} from proxy/WAF is transient, keeps Pro under grace`, async () => {
+		const { mgr, advance } = setup([granted(), { status, json: null }]);
+		await mgr.activate('KEY', 'x');
+		advance(DAY);
+		await mgr.refreshIfDue();
+		assert.equal(mgr.state.status, 'valid');
+		assert.equal(mgr.isPro(), true);
+		assert.match(mgr.state.message, /Could not reach/);
+	});
+	test(`S-31: activate ${status} without Polar body is transient, not invalid`, async () => {
+		const { mgr } = setup([{ status, json: '<html>blocked</html>' }], { useActivations: true });
+		await mgr.activate('KEY', 'x');
+		assert.notEqual(mgr.state.status, 'invalid');
+		assert.equal(mgr.isPro(), false);
+	});
+}
+
+test('S-31: validate 422 marks invalid', async () => {
+	const { mgr, advance } = setup([granted(), { status: 422, json: { detail: [] } }]);
+	await mgr.activate('KEY', 'x');
+	advance(DAY);
+	await mgr.refreshIfDue();
+	assert.equal(mgr.state.status, 'invalid');
+	assert.equal(mgr.isPro(), false);
+});
+
+test('S-31: explicit revoked in 200 body still marks invalid', async () => {
+	const { mgr } = setup([granted({ status: 'revoked' })]);
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.state.status, 'invalid');
+});
