@@ -1,4 +1,5 @@
-import { MarkdownRenderChild, Notice, moment, setIcon } from 'obsidian';
+import { MarkdownRenderChild, Notice, setIcon } from 'obsidian';
+import { todayKey } from './time';
 import type StreakwisePlugin from '../main';
 import { applyFreeLimits, parseBlockConfig } from '../core/blockConfig';
 import { buildHeatmapModel } from '../core/heatmapModel';
@@ -57,7 +58,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		const isPro = plugin.license.isPro();
 		const proSoon = !plugin.license.isConfigured();
 		const { config, locked } = applyFreeLimits(parsed, isPro);
-		const today = moment().format('YYYY-MM-DD');
+		const today = todayKey();
 		const source = resolveDailySource(plugin.app, s);
 		const index = plugin.dailyIndex.get(source);
 		const data = habitValues(index, config.habits);
@@ -149,7 +150,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			desc.createEl('code', { text: folder });
 		} else desc.appendText('your vault root');
 		desc.appendText(' and its subfolders for notes named like ');
-		desc.createEl('code', { text: formatDailyNoteName(moment().format('YYYY-MM-DD'), format) });
+		desc.createEl('code', { text: formatDailyNoteName(todayKey(), format) });
 		desc.appendText(` (format ${format})`);
 		desc.appendText('. Create a daily note, or change the location in settings.');
 		const btn = card.createEl('button', { text: 'Open Streakwise settings' });

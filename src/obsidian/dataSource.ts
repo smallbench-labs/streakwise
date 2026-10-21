@@ -1,4 +1,5 @@
-import { App, TFile, TFolder, moment } from 'obsidian';
+import { App, TFile, TFolder } from 'obsidian';
+import { parseStrictDate } from './time';
 import { DayKey } from '../core/dates';
 import { readHabit } from '../core/values';
 import { parseDailyNoteDate } from '../core/noteDates';
@@ -49,9 +50,7 @@ export function resolveDailySource(app: App, s: SourceSettings): DailySource {
 /** Date of a note from its path inside the daily-notes folder, or null if it is not a daily note. */
 export function dailyNoteDate(path: string, source: DailySource): DayKey | null {
 	return matchDailyNote(path, source.folder, (text) => {
-		const m = moment(text, source.format, true);
-		if (m.isValid()) return m.format('YYYY-MM-DD');
-		return parseDailyNoteDate(text, source.format);
+		return parseStrictDate(text, source.format) ?? parseDailyNoteDate(text, source.format);
 	});
 }
 

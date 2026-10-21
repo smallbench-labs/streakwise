@@ -25,3 +25,13 @@ test('S-25: strings: wrong types and empty format fall back', () => {
 	assert.deepEqual([s.customFolder, s.customFormat, s.defaultHabit, s.exportFolder], ['', 'YYYY-MM-DD', 'run', 'Streakwise exports']);
 	assert.deepEqual(sanitizeSettings({}, D), D);
 });
+
+// 0.1.2: declarative settings (Obsidian 1.13+) are feature-detected, never version-checked.
+import { hasDeclarativeSettings } from '../src/settingsCompat';
+test('0.1.2: hasDeclarativeSettings feature detection', () => {
+	assert.equal(hasDeclarativeSettings({ getSettingDefinitions() { return []; }, update() {} }), true);
+	assert.equal(hasDeclarativeSettings({ display() {} }), false); // Obsidian < 1.13
+	assert.equal(hasDeclarativeSettings({ getSettingDefinitions() { return []; } }), false);
+	assert.equal(hasDeclarativeSettings(null), false);
+	assert.equal(hasDeclarativeSettings(undefined), false);
+});
