@@ -230,8 +230,7 @@ test('free-only build (placeholder org id): no fetch/requestUrl/http at all, Pro
 	try {
 		// Stale "valid" cache from a hypothetical older build must not unlock Pro either.
 		const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', status: 'valid', lastValidatedAt: T0, lastCheckedAt: 0, activationId: 'a' };
-		const mgr = new LicenseManager(cache, { ...DEFAULT_LICENSE_CONFIG }, http.http, () => T0 + 2 * DAY, async () => {});
-		assert.equal(DEFAULT_LICENSE_CONFIG.organizationId, 'REPLACE_WITH_POLAR_ORG_ID');
+		const mgr = new LicenseManager(cache, { ...DEFAULT_LICENSE_CONFIG, organizationId: 'REPLACE_WITH_POLAR_ORG_ID' }, http.http, () => T0 + 2 * DAY, async () => {});
 		assert.equal(mgr.isConfigured(), false);
 		assert.equal(mgr.isPro(), false);
 		await mgr.refreshIfDue();
@@ -243,4 +242,12 @@ test('free-only build (placeholder org id): no fetch/requestUrl/http at all, Pro
 	} finally {
 		globalThis.fetch = origFetch;
 	}
+});
+
+test('v0.2 default config: real Polar org id, portal, 5-device activations', () => {
+	assert.equal(DEFAULT_LICENSE_CONFIG.organizationId, '189678f8-c892-4af0-8586-0bf2a6873e02');
+	assert.equal(DEFAULT_LICENSE_CONFIG.portalUrl, 'https://polar.sh/formchime/portal');
+	assert.equal(DEFAULT_LICENSE_CONFIG.useActivations, true);
+	const mgr = new LicenseManager({ ...EMPTY_LICENSE }, { ...DEFAULT_LICENSE_CONFIG }, async () => { throw new Error('no'); }, () => T0, async () => {});
+	assert.equal(mgr.isConfigured(), true);
 });

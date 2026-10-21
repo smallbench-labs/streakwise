@@ -2,9 +2,9 @@
 
 See at a glance whether you kept your habits. Streakwise turns the properties you already log in your daily notes, like `exercise: true` or `reading: 30 min`, into a heatmap with your current and longest streak.
 
-For anyone who tracks habits in daily notes and wants a visual check without adding a separate app. The yearly heatmap is free and works offline. Pro features coming soon: more views, multiple habits per block, and PNG export.
+For anyone who tracks habits in daily notes and wants a visual check without adding a separate app. The yearly heatmap is free and works offline. Pro adds more views, multiple habits per block, and PNG export.
 
-![Free yearly heatmap, and a month view (Pro, coming soon) falling back to the yearly view](shots/10_free_yearly_and_locked_month.png)
+![Free yearly heatmap, and a Pro month view falling back to the yearly view](shots/10_free_yearly_and_locked_month.png)
 
 ## Features
 
@@ -12,7 +12,7 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 - Yearly heatmap of one habit, with current streak, longest streak and days done.
 - Light and dark theme support. 4 colour palettes (green, blue, purple, orange); shades get darker as values rise, so levels can be read by lightness, not hue alone.
 
-**Streakwise Pro (coming soon):**
+**Streakwise Pro (one-time purchase, US$19):**
 - Month, week, quarter and year-to-date views.
 - Several habits in one block.
 - Export a heatmap as PNG into your vault (generated locally, no upload).
@@ -52,32 +52,52 @@ Only notes **inside the daily-notes folder or its subfolders** are counted. A no
 
 The command **Insert heatmap block** adds a starter block.
 
+## Payment disclosure
+
+- **Optional payments:** this plugin offers an optional paid upgrade (Streakwise Pro). Payment: optional. The yearly heatmap is free and fully functional.
+- Streakwise Pro is a **one-time purchase (US$19)** sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
+- No account is required to use the plugin. The **Buy Pro** button opens https://formchime.com/api/checkout?product=streakwise-pro, which redirects to a Polar checkout; checkout creates a customer record with Polar (email).
+- A key can be active on **5 devices**. To move it, deactivate an old device in the Polar customer portal; Streakwise re-activates automatically on its next check.
+  Customer portal: https://polar.sh/formchime/portal
+- Pro is a one-time purchase: keys do not expire.
+- **Refunds:** Full refund within 14 days of purchase, no questions asked. Request it by replying to your Polar receipt email or writing to support@formchime.com. After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
+- Streakwise Pro is currently not sold to customers in Japan. The free features work everywhere.
+
 ## Network use disclosure
 
-- **Streakwise makes no network requests.** All heatmap and streak features run locally.
-- Nothing from your vault is sent anywhere. No telemetry, analytics or ads.
+- **No network requests are made unless you open the Pro settings panel or enter a license key.** All heatmap, streak and PNG export features run locally.
+- When you open **Settings → Streakwise → Pro license** without an active Pro key, Streakwise sends one `GET https://formchime.com/api/region` request to check whether Pro can be sold in your region (the server sees your IP address; nothing else is sent). If the answer is "blocked", the Buy Pro button is hidden. If the request fails, the button is still shown.
+- With a key, when you press **Activate** and then at most **once a day** on startup, Streakwise contacts Polar:
+  - `POST https://api.polar.sh/v1/customer-portal/license-keys/activate` — reserves one of the key's 5 device slots (sends the key, our public Polar organization ID and the label "Obsidian").
+  - `POST https://api.polar.sh/v1/customer-portal/license-keys/validate` — confirms the key (sends the key, organization ID and activation ID).
+- Nothing from your vault is sent: no note content, file names or habit data.
+- Offline: after a successful check, Pro stays unlocked for **7 days** without internet.
+- No telemetry, analytics or ads. Polar privacy policy: https://polar.sh/legal/privacy
 
 ## Data storage
 
-- Settings are stored in `.obsidian/plugins/streakwise/data.json` in your vault.
-- No files outside your vault are read or written.
+- Settings and the cached license result are stored in `.obsidian/plugins/streakwise/data.json` in your vault.
+- **License key:** on Obsidian 1.11.4+ it is stored in Obsidian's **Keychain** (Settings → Keychain, ID `streakwise-license-key`), not in vault files, so it is not synced or committed with your notes. Encryption comes from the operating system's secret store; if none is available (e.g. some Linux setups), Obsidian keeps Keychain secrets unencrypted. On older Obsidian versions the key is stored in `data.json`. Keys saved by earlier builds are migrated automatically.
+- Exported PNGs go to the folder set in settings (default `Streakwise exports/`).
+- No files outside your vault are read or written (besides Obsidian's own Keychain).
 
 ## Known limits
 
 - Only frontmatter properties are read (not task checkboxes in the note body).
+- The offline grace period uses your device clock; setting the clock back can extend it.
 
 ## Development
 
 ```bash
 npm install
 npm run build   # type-check + bundle to main.js
-npm test        # unit tests for date/value/streak/scale/config logic and licensing (mocked HTTP + clock; free-only build makes no requests)
+npm test        # unit tests for date/value/streak/scale/config logic and licensing (mocked HTTP + clock)
 npm run lint
 ```
 
 ## Support
 
-Bugs and questions: open an issue at https://github.com/smallbench-labs/streakwise/issues. Other questions: support@formchime.com.
+Bugs and questions: open an issue at https://github.com/smallbench-labs/streakwise/issues. Billing and refunds: support@formchime.com.
 
 ## Clean-room statement
 

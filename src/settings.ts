@@ -1,6 +1,8 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type StreakwisePlugin from './main';
 import { EMPTY_LICENSE, LicenseCache } from './license/types';
+import { CHECKOUT_URL, shouldShowBuyButton } from './license/checkout';
+import { obsidianHttpGetJson } from './license/obsidianHttp';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
 import { SourceSettings, resolveDailySource } from './obsidian/dataSource';
@@ -112,6 +114,16 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Status')
 			.setDesc(lic.state.message ? `${status} ${lic.state.message}` : status);
+
+		if (!lic.isPro()) {
+			// Region check fires only here, when the Pro panel is opened. Hidden only if explicitly blocked.
+			const buy = new Setting(containerEl)
+				.setName('Get Streakwise Pro')
+				.setDesc('One-time purchase, US$19, through Polar. Not sold in Japan.')
+				.addButton((b) => b.setButtonText('Buy Pro').onClick(() => { window.open(CHECKOUT_URL); }));
+			buy.settingEl.hide();
+			void shouldShowBuyButton(obsidianHttpGetJson).then((show) => { if (show) buy.settingEl.show(); });
+		}
 
 		new Setting(containerEl)
 			.setName('License key')

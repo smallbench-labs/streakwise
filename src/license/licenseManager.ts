@@ -3,9 +3,9 @@ import { Clock, EMPTY_LICENSE, HttpPost, LicenseCache, LicenseConfig } from './t
 const DAY = 24 * 60 * 60 * 1000;
 
 export const DEFAULT_LICENSE_CONFIG: LicenseConfig = {
-	organizationId: 'REPLACE_WITH_POLAR_ORG_ID',
+	organizationId: '189678f8-c892-4af0-8586-0bf2a6873e02',
 	useActivations: true, // Polar benefit: 5 activations per key, keys never expire
-	portalUrl: 'https://polar.sh/REPLACE_WITH_ORG_SLUG/portal',
+	portalUrl: 'https://polar.sh/formchime/portal',
 	apiBase: 'https://api.polar.sh',
 	gracePeriodMs: 7 * DAY,
 	recheckIntervalMs: 1 * DAY,
