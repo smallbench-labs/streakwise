@@ -7,8 +7,8 @@ export const DEFAULT_LICENSE_CONFIG: LicenseConfig = {
 	useActivations: true, // Polar benefit: 5 activations per key, keys never expire
 	portalUrl: 'https://polar.sh/REPLACE_WITH_ORG_SLUG/portal',
 	apiBase: 'https://api.polar.sh',
-	gracePeriodMs: 7 * DAY,
-	recheckIntervalMs: 1 * DAY,
+	gracePeriodMs: 604_800_000, // 7 days (literal so the free build can tree-shake this object)
+	recheckIntervalMs: 86_400_000, // 1 day
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

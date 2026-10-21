@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, StreakwiseSettingTab, StreakwiseSettings } from './se
 import { LicenseManager, DEFAULT_LICENSE_CONFIG } from './license/licenseManager';
 import { obsidianHttpPost } from './license/obsidianHttp';
 import { KeyStore, selectKeyStore } from './license/keyStore';
+import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
 import { DailyNoteIndex } from './obsidian/dataSource';
 
@@ -28,7 +29,8 @@ export default class StreakwisePlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('delete', notesChanged));
 		this.registerEvent(this.app.vault.on('rename', notesChanged));
 
-		this.license = new LicenseManager(
+		// FREE_BUILD (v0.1.x): esbuild drops the license/HTTP code entirely; Pro never unlocks.
+		this.license = FREE_BUILD ? FREE_LICENSE : new LicenseManager(
 			this.settings.license,
 			DEFAULT_LICENSE_CONFIG,
 			obsidianHttpPost,
@@ -57,7 +59,7 @@ export default class StreakwisePlugin extends Plugin {
 		this.addSettingTab(new StreakwiseSettingTab(this.app, this));
 
 		// Background license re-check only when a key exists; never blocks startup.
-		this.app.workspace.onLayoutReady(() => { void this.license.refreshIfDue(); });
+		if (!FREE_BUILD) this.app.workspace.onLayoutReady(() => { void this.license.refreshIfDue(); });
 	}
 
 	/** Re-render visible blocks, e.g. after settings change (the folder/format may differ). */
@@ -81,7 +83,7 @@ export default class StreakwisePlugin extends Plugin {
 		this.settings = { ...DEFAULT_SETTINGS, ...data, license: { ...DEFAULT_SETTINGS.license, ...data?.license } };
 
 		// Keychain on Obsidian 1.11.4+, data.json on older versions.
-		this.keyStore = selectKeyStore(this.app);
+		this.keyStore = FREE_BUILD ? FREE_KEY_STORE : selectKeyStore(this.app);
 		const legacyKey = this.settings.license.key;
 		this.settings.license.key = this.keyStore.load(legacyKey);
 		if (this.keyStore.kind === 'keychain' && legacyKey) {

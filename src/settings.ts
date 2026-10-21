@@ -95,7 +95,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 
 	private displayLicense(containerEl: HTMLElement) {
 		const lic = this.plugin.license;
-		if (!lic.isConfigured()) {
+		if (FREE_BUILD || !lic.isConfigured()) {
 			// Free-only build: no key field, no purchase link, no network.
 			new Setting(containerEl).setName('Pro').setHeading();
 			new Setting(containerEl)

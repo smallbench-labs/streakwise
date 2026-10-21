@@ -10,7 +10,7 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 
 **Free (fully offline, no account, no network):**
 - Yearly heatmap of one habit, with current streak, longest streak and days done.
-- Light and dark theme support. 4 colour palettes (green, blue, purple, orange); shades get darker as values rise, so levels can be read by lightness, not hue alone.
+- Light and dark theme support. 4 colour palettes (green, blue, purple, orange); higher values get darker in light themes and brighter in dark themes, so levels can be read by lightness, not hue alone.
 
 **Streakwise Pro (coming soon):**
 - Month, week, quarter and year-to-date views.
