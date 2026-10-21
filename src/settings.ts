@@ -1,7 +1,8 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type StreakwisePlugin from './main';
 import { EMPTY_LICENSE, LicenseCache } from './license/types';
-import { CHECKOUT_URL, shouldShowBuyButton } from './license/checkout';
+import { CHECKOUT_URL, HttpGetJson } from './license/checkout';
+import { BuyGate } from './license/buyGate';
 import { obsidianHttpGetJson } from './license/obsidianHttp';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
@@ -38,6 +39,8 @@ interface Row {
 	name: string;
 	desc?: string;
 	render?: (setting: Setting) => void;
+	/** Declarative `visible` predicate (1.13+); display() applies it by hiding the row. */
+	visible?: () => boolean;
 }
 interface Section {
 	heading: string;
@@ -48,6 +51,7 @@ interface RowDefinition {
 	name: string;
 	desc?: string;
 	render?: (setting: Setting) => void;
+	visible?: () => boolean;
 }
 interface GroupDefinition {
 	type: 'group';
@@ -57,9 +61,36 @@ interface GroupDefinition {
 
 export class StreakwiseSettingTab extends PluginSettingTab {
 	private keyDraft = '';
+	/** Region GET; overridable in tests. */
+	regionGet: HttpGetJson | null = null;
+	private buyGate: BuyGate | null = null;
+	/** Legacy display() path: the drawn Buy row, toggled directly when the region is known. */
+	private legacyBuyEl: HTMLElement | null = null;
 
 	constructor(app: App, private plugin: StreakwisePlugin) {
 		super(app, plugin);
+	}
+
+	private buyVisible(): boolean {
+		return this.buyGate?.visible() ?? false;
+	}
+
+	/** Region known: re-evaluate visibility. 1.13+: refreshDomState() (or update()); legacy: toggle the row. */
+	private onRegionSettled() {
+		if (hasDeclarativeSettings(PluginSettingTab.prototype)) {
+			const self = this as unknown as { refreshDomState?: () => void };
+			if (typeof self.refreshDomState === 'function') self.refreshDomState();
+			else this.refresh();
+		} else if (this.legacyBuyEl) {
+			if (this.buyVisible()) this.legacyBuyEl.show(); else this.legacyBuyEl.hide();
+		}
+	}
+
+	hide(): void {
+		// Next time the tab opens, check the region again.
+		this.buyGate?.reset();
+		this.legacyBuyEl = null;
+		super.hide();
 	}
 
 	/** Re-render: declarative tabs must use the base update(); display() is bypassed on 1.13+. */
@@ -88,6 +119,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				const def: RowDefinition = { name: r.name };
 				if (r.desc !== undefined) def.desc = r.desc;
 				if (r.render) def.render = r.render;
+				if (r.visible) def.visible = r.visible;
 				return def;
 			}),
 		}));
@@ -103,6 +135,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				const setting = new Setting(containerEl).setName(r.name);
 				if (r.desc !== undefined) setting.setDesc(r.desc);
 				r.render?.(setting);
+				if (r.visible && !r.visible()) setting.settingEl.hide();
 			}
 		}
 	}
@@ -193,17 +226,24 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			const status = lic.isPro()
 				? `Pro unlocked (offline grace: ${lic.graceDaysLeft()} day(s) left).`
 				: lic.state.status === 'invalid' ? 'Pro locked.' : 'Free version: yearly heatmap of one habit.';
-			const rows: Row[] = [{ name: 'Status', desc: lic.state.message ? `${status} ${lic.state.message}` : status }];
-			if (!lic.isPro()) {
-				// Region check fires only when the Pro panel is drawn. Hidden only if explicitly blocked;
-				// a failed region request still shows the button.
+			const needsBuy = !lic.isPro();
+			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
+			const gate = this.buyGate ?? (this.buyGate = new BuyGate(this.regionGet ?? obsidianHttpGetJson));
+			const rows: Row[] = [{
+				name: 'Status',
+				desc: lic.state.message ? `${status} ${lic.state.message}` : status,
+				// The region check starts only when the Pro panel is actually drawn (never during search indexing).
+				render: needsBuy ? () => { void gate.ensure(() => this.onRegionSettled()); } : undefined,
+			}];
+			if (needsBuy) {
+				// S-34: hidden until the region is known; shown if the request fails; hidden if blocked.
 				rows.push({
 					name: 'Get Streakwise Pro',
 					desc: 'One-time purchase, US$19, through Polar. Not sold in Japan.',
+					visible: () => this.buyVisible(),
 					render: (st) => {
 						st.addButton((b) => b.setButtonText('Buy Pro').onClick(() => { window.open(CHECKOUT_URL); }));
-						st.settingEl.hide();
-						void shouldShowBuyButton(obsidianHttpGetJson).then((show) => { if (show) st.settingEl.show(); });
+						this.legacyBuyEl = st.settingEl;
 					},
 				});
 			}

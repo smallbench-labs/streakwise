@@ -1,0 +1,149 @@
+// S-34: Buy Pro visibility on the 1.13+ declarative path and the legacy display() path.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Setting, setDeclarative, mockEnv } from 'obsidian';
+import { StreakwiseSettingTab } from '../src/settings';
+import { EMPTY_LICENSE } from '../src/license/types';
+import type { HttpGetJson } from '../src/license/checkout';
+
+interface Def { name?: string; render?: (s: unknown) => void; visible?: () => boolean; type?: string; items?: Def[] }
+
+function makeTab(get: HttpGetJson, isPro = false) {
+	const plugin = {
+		settings: { sourceMode: 'custom', customFolder: 'Daily', customFormat: 'YYYY-MM-DD', defaultHabit: '', weekStart: 1, palette: 'accent', exportFolder: 'x', license: { ...EMPTY_LICENSE } },
+		license: { isConfigured: () => true, isPro: () => isPro, graceDaysLeft: () => 0, state: { ...EMPTY_LICENSE } },
+		keyStore: { kind: 'keychain' },
+		saveSettings: async () => {},
+		refreshAfterSettings: () => {},
+	};
+	const app = { internalPlugins: { getPluginById: () => null }, plugins: { getPlugin: () => null }, vault: { getConfig: () => null } };
+	const tab = new StreakwiseSettingTab(app as never, plugin as never);
+	tab.regionGet = get;
+	return tab;
+}
+
+function deferred() {
+	let resolve!: (v: { status: number; json: unknown }) => void;
+	let reject!: (e: Error) => void;
+	const p = new Promise<{ status: number; json: unknown }>((res, rej) => { resolve = res; reject = rej; });
+	let calls = 0;
+	const get: HttpGetJson = () => { calls++; return p; };
+	return { get, resolve, reject, calls: () => calls };
+}
+
+// Legacy display() draws every row, including the colour swatches (DOM). A permissive stub is enough.
+function anyStub(): unknown {
+	const f = function () { return anyStub(); };
+	return new Proxy(f, { get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : anyStub()), apply: () => anyStub(), set: () => true });
+}
+(globalThis as { document?: unknown }).document ??= anyStub();
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+function proDefs(tab: StreakwiseSettingTab): Def[] {
+	const groups = tab.getSettingDefinitions() as unknown as Def[];
+	const pro = groups.find((g) => g.type === 'group' && g.items?.some((i) => i.name === 'Status'));
+	assert.ok(pro);
+	return pro.items ?? [];
+}
+
+/** Simulates Obsidian 1.13 drawing the tab: render every row, evaluate `visible`. */
+function drawDeclarative(tab: StreakwiseSettingTab) {
+	const items = proDefs(tab);
+	for (const d of items) d.render?.(new Setting());
+	return {
+		buy: items.find((d) => d.name === 'Get Streakwise Pro'),
+	};
+}
+
+for (const [label, settle, expected] of [
+	['blocked -> hidden', (d: ReturnType<typeof deferred>) => d.resolve({ status: 200, json: { blocked: true } }), false],
+	['not blocked -> shown', (d: ReturnType<typeof deferred>) => d.resolve({ status: 200, json: { blocked: false } }), true],
+	['request fails -> shown', (d: ReturnType<typeof deferred>) => d.reject(new Error('offline')), true],
+	['error status -> shown', (d: ReturnType<typeof deferred>) => d.resolve({ status: 500, json: null }), true],
+] as const) {
+	test(`S-34 1.13+: ${label}; hidden while unknown; DOM state refreshed after the check`, async () => {
+		setDeclarative(true);
+		const d = deferred();
+		const tab = makeTab(d.get);
+		const { buy } = drawDeclarative(tab);
+		assert.ok(buy?.visible, 'Buy row uses the declarative visible predicate');
+		assert.equal(buy.visible(), false, 'hidden until region is known');
+		const before = mockEnv.domRefreshes;
+		settle(d);
+		await tick();
+		assert.equal(buy.visible(), expected);
+		assert.equal(mockEnv.domRefreshes, before + 1, 'refreshDomState() called once after the check');
+		// A re-fetch of definitions (update()) keeps the known state without a new request.
+		const again = proDefs(tab).find((x) => x.name === 'Get Streakwise Pro');
+		assert.equal(again?.visible?.(), expected);
+		assert.equal(d.calls(), 1);
+	});
+}
+
+test('S-34 1.13+: getSettingDefinitions alone (search indexing) makes no region request', () => {
+	setDeclarative(true);
+	const d = deferred();
+	const tab = makeTab(d.get);
+	tab.getSettingDefinitions();
+	tab.getSettingDefinitions();
+	assert.equal(d.calls(), 0);
+});
+
+test('S-34 1.13+: Pro users get no Buy row and no region request', () => {
+	setDeclarative(true);
+	const d = deferred();
+	const tab = makeTab(d.get, true);
+	const { buy } = drawDeclarative(tab);
+	assert.equal(buy, undefined);
+	assert.equal(d.calls(), 0);
+});
+
+test('S-34 1.13+: closing the tab re-checks the region next time', async () => {
+	setDeclarative(true);
+	let calls = 0;
+	const tab = makeTab(async () => { calls++; return { status: 200, json: { blocked: true } }; });
+	drawDeclarative(tab);
+	await tick();
+	tab.hide();
+	const { buy } = drawDeclarative(tab);
+	assert.equal(buy?.visible?.(), false);
+	await tick();
+	assert.equal(calls, 2);
+});
+
+for (const [label, json, expected] of [['blocked', { blocked: true }, true], ['allowed', { blocked: false }, false]] as const) {
+	test(`S-34 legacy display(): ${label} -> Buy row hidden=${expected}`, async () => {
+		setDeclarative(false);
+		try {
+			const d = deferred();
+			const tab = makeTab(d.get);
+			Setting.created.length = 0;
+			tab.display();
+			const buy = Setting.created.find((s) => s.name === 'Get Streakwise Pro');
+			assert.ok(buy);
+			assert.equal(buy.settingEl.hidden, true, 'hidden until known');
+			d.resolve({ status: 200, json });
+			await tick();
+			assert.equal(buy.settingEl.hidden, expected);
+		} finally {
+			setDeclarative(true);
+		}
+	});
+}
+
+test('S-34 legacy display(): request failure still shows the button', async () => {
+	setDeclarative(false);
+	try {
+		const d = deferred();
+		const tab = makeTab(d.get);
+		Setting.created.length = 0;
+		tab.display();
+		const buy = Setting.created.find((s) => s.name === 'Get Streakwise Pro');
+		d.reject(new Error('offline'));
+		await tick();
+		assert.equal(buy?.settingEl.hidden, false);
+	} finally {
+		setDeclarative(true);
+	}
+});

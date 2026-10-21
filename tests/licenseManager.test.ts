@@ -417,3 +417,65 @@ test('S-31: explicit revoked in 200 body still marks invalid', async () => {
 	await mgr.activate('KEY', 'x');
 	assert.equal(mgr.state.status, 'invalid');
 });
+
+// ---- S-33: lastSeen recorded on load and periodically, forward-only ----
+function setupMono(responses: Parameters<typeof fakeHttp>[0], cache: LicenseCache = { ...EMPTY_LICENSE }) {
+	let now = T0;
+	let mono = 0;
+	const { http, calls } = fakeHttp(responses);
+	const saved: LicenseCache[] = [];
+	const mgr = new LicenseManager(cache, { ...DEFAULT_LICENSE_CONFIG, organizationId: ORG, useActivations: false }, http, () => now, async (c) => { saved.push(c); }, () => mono);
+	return { mgr, calls, saved, setNow: (t: number) => { now = t; }, wall: (ms: number) => { now += ms; }, run: (ms: number) => { now += ms; mono += ms; } };
+}
+
+test('S-33: touch() advances lastSeen with time and never decreases it', async () => {
+	const { mgr, run, wall } = setupMono([granted()]);
+	await mgr.activate('KEY', 'x');
+	await mgr.touch();
+	run(3_600_000);
+	await mgr.touch();
+	assert.equal(mgr.state.lastSeenAt, T0 + 3_600_000);
+	wall(-2 * DAY); // clock set back during the session
+	await mgr.touch();
+	assert.equal(mgr.state.lastSeenAt, T0 + 3_600_000);
+	run(3_600_000); // an hour of real use while the clock is behind still counts
+	await mgr.touch();
+	assert.equal(mgr.state.lastSeenAt, T0 + 2 * 3_600_000);
+});
+
+test('S-33: touch() without a key does nothing', async () => {
+	const { mgr, saved } = setupMono([]);
+	await mgr.touch();
+	assert.equal(saved.length, 0);
+});
+
+test('S-33: onLoad with clock behind lastSeen forces revalidation', async () => {
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', status: 'valid', lastValidatedAt: T0 - DAY, lastCheckedAt: T0 - DAY, lastSeenAt: T0 + DAY };
+	const { mgr, calls } = setupMono([granted()], cache); // now = T0, a day behind lastSeen
+	await mgr.onLoad();
+	assert.equal(calls.length, 1);
+	assert.equal(mgr.isPro(), true);
+});
+
+test('S-33: onLoad within recheck interval and clock fine: no request, lastSeen recorded', async () => {
+	const { mgr, calls, run } = setupMono([granted()]);
+	await mgr.activate('KEY', 'x');
+	run(2 * 3_600_000);
+	await mgr.onLoad();
+	assert.equal(calls.length, 1);
+	assert.equal(mgr.state.lastSeenAt, T0 + 2 * 3_600_000);
+});
+
+test('S-33: QA scenario - rewinding to just after the last check each session no longer keeps Pro forever offline', async () => {
+	const { mgr, setNow, run } = setupMono([granted(), ...Array.from({ length: 60 }, () => 'throw' as const)]);
+	await mgr.activate('KEY', 'x'); // validated at T0
+	let pro = 0;
+	for (let i = 0; i < 60; i++) {
+		setNow(T0 + 60_000); // user rewinds to 1 minute after the last check, stays offline
+		await mgr.onLoad();
+		if (mgr.isPro()) pro++;
+		for (let h = 0; h < 4; h++) { run(3_600_000); await mgr.touch(); } // 4-hour session, hourly touch
+	}
+	assert.ok(pro < 60, `Pro in ${pro}/60 sessions`);
+	assert.equal(mgr.isPro(), false); // 60 x 4h = 10 days of use > 7-day grace
+});

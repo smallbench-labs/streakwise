@@ -9,6 +9,8 @@ export const FREE_LICENSE = {
 	isConfigured: () => false,
 	graceDaysLeft: () => 0,
 	refreshIfDue: async () => EMPTY_LICENSE,
+	onLoad: async () => EMPTY_LICENSE,
+	touch: async () => {},
 	activate: async () => EMPTY_LICENSE,
 	clear: async () => {},
 } as unknown as LicenseManager;

@@ -35,7 +35,34 @@ export class LicenseManager {
 		private readonly http: HttpPost,
 		private readonly now: Clock,
 		private readonly save: (cache: LicenseCache) => Promise<void>,
+		/** Monotonic clock (performance.now); unaffected by wall-clock changes. */
+		private readonly mono: Clock = () => performance.now(),
 	) {}
+
+	private lastMono: number | null = null;
+
+	/**
+	 * S-33: record that time has passed. Called on load and periodically while Obsidian runs.
+	 * Forward-only: lastSeenAt = max(lastSeenAt + monotonic time elapsed since the last touch, now).
+	 * Never decreases, so a wall clock set back during a session cannot hide elapsed usage.
+	 */
+	async touch(): Promise<void> {
+		if (!this.cache.key || !this.isConfigured()) return;
+		const m = this.mono();
+		const prev = this.cache.lastSeenAt ?? 0;
+		const elapsed = this.lastMono === null ? 0 : Math.max(0, m - this.lastMono);
+		this.lastMono = m;
+		const next = Math.max(prev + (prev ? elapsed : 0), this.now());
+		if (next <= prev) return;
+		await this.update({ ...this.cache, lastSeenAt: next }, true);
+	}
+
+	/** On plugin load: a clock behind lastSeen forces revalidation (S-30/S-33); then record time as usual. */
+	async onLoad(): Promise<LicenseCache> {
+		const result = await this.refreshIfDue();
+		await this.touch();
+		return result;
+	}
 
 	get state(): Readonly<LicenseCache> {
 		return this.cache;

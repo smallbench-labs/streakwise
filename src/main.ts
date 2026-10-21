@@ -63,7 +63,13 @@ export default class StreakwisePlugin extends Plugin {
 		this.addSettingTab(new StreakwiseSettingTab(this.app, this));
 
 		// Background license re-check only when a key exists; never blocks startup.
-		if (!FREE_BUILD) this.app.workspace.onLayoutReady(() => { void this.license.refreshIfDue(); });
+		// S-33: also record lastSeen on load and hourly (forward-only), and re-check when due or the clock went back.
+		if (!FREE_BUILD) {
+			this.app.workspace.onLayoutReady(() => { void this.license.onLoad(); });
+			this.registerInterval(window.setInterval(() => {
+				void this.license.touch().then(() => this.license.refreshIfDue());
+			}, 3_600_000));
+		}
 	}
 
 	/** Open this plugin's tab in Obsidian settings (empty-state button). */
