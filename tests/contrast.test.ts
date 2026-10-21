@@ -3,8 +3,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// Obsidian 1.14 default --interactive-accent (light / dark), measured with getComputedStyle.
-const ACCENT_LIGHT = '#9873f7', ACCENT_DARK = '#8a5cf5';
 const BG = { light: '#ffffff', dark: '#1e1e1e' }; // Obsidian default --background-primary
 
 function luminance(hex: string): number {
@@ -50,34 +48,57 @@ test('empty cells have a visible border', () => {
 	assert.match(css, /\.sw-cell\.sw-l0 \{[^}]*stroke: var\(--text-muted\)(?![^}]*stroke-opacity)/);
 });
 
-// --- Accent palette (default): color-mix of the theme accent with --text-normal, checked with Obsidian's
-// default theme values (measured in Obsidian 1.14 under Xvfb; see obsidian-internal/uiux-r2-fixes.md).
-const DEFAULT_THEME = {
-	light: { bg: '#ffffff', accent: ACCENT_LIGHT, text: '#222222', onAccent: '#ffffff' },
-	dark: { bg: '#1c1c1c', accent: ACCENT_DARK, text: '#dadada', onAccent: '#ffffff' },
+// --- Accent palette (default): fixed OKLCH lightness ladder in the theme accent's hue/chroma.
+// Accent and background values measured in Obsidian 1.14.4 (getComputedStyle) for the default theme and Minimal;
+// see obsidian-internal/contrast-r3.md for the in-app rendered table.
+const THEMES = {
+	'default light': { dark: false, bg: '#ffffff', accent: '#9873f7' },
+	'default dark': { dark: true, bg: '#1c1c1c', accent: '#8a5cf5' },
+	'Minimal light': { dark: false, bg: '#ffffff', accent: '#7c95a2' },
+	'Minimal dark': { dark: true, bg: '#262626', accent: '#7992a0' },
+	'grey accent (chroma 0) light': { dark: false, bg: '#ffffff', accent: '#7a7a7a' },
+	'grey accent (chroma 0) dark': { dark: true, bg: '#1e1e1e', accent: '#7a7a7a' },
 };
-const hex = (n: number[]) => '#' + n.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('');
-const rgb = (h: string) => [0, 2, 4].map((i) => parseInt(h.slice(1 + i, 3 + i), 16));
-/** CSS color-mix(in srgb, a p%, b). */
-const mix = (a: string, p: number, b: string) => { const x = rgb(a), y = rgb(b); return hex(x.map((c, i) => c * p + (y[i] ?? 0) * (1 - p))); };
-const accentRule = css.match(/\.sw-palette-accent \{([^}]*)\}/)?.[1] ?? '';
-const pcts = [...accentRule.matchAll(/--sw-(\d): color-mix\(in srgb, var\(--interactive-accent\) (\d+)%, var\(--text-normal\)\)/g)].map((m) => Number(m[2]) / 100);
+const toLin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const fromLin = (c: number) => { const x = Math.min(1, Math.max(0, c)); return x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055; };
+function hexToOklch(hex: string): [number, number, number] {
+	const [r, g, b] = [1, 3, 5].map((i) => toLin(parseInt(hex.slice(i, i + 2), 16) / 255)) as [number, number, number];
+	const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+	const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+	const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+	const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+	const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+	return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, Math.hypot(A, B), Math.atan2(B, A)];
+}
+function oklchToHex(L: number, C: number, h: number): string {
+	const A = C * Math.cos(h), B = C * Math.sin(h);
+	const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+	const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+	const s = (L - 0.0894841775 * A - 1.2914855480 * B) ** 3;
+	const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+	return '#' + rgb.map((c) => Math.round(fromLin(c) * 255).toString(16).padStart(2, '0')).join('');
+}
+const ladder = (sel: RegExp) => {
+	const body = css.match(sel)?.[1] ?? '';
+	return [...body.matchAll(/--sw-(\d): oklch\(from var\(--interactive-accent\) ([\d.]+) c h\)/g)].map((m) => Number(m[2]));
+};
+const LADDER = { light: ladder(/\n\.sw-palette-accent \{([^}]*)\}/), dark: ladder(/\.theme-dark \.sw-palette-accent \{([^}]*)\}/) };
 
-test('accent palette defined with color-mix for levels 2-4', () => {
-	assert.match(accentRule, /--sw-1: var\(--interactive-accent\)/);
-	assert.equal(pcts.length, 3);
+test('accent palette: 4-step OKLCH lightness ladders for light and dark', () => {
+	assert.equal(LADDER.light.length, 4);
+	assert.equal(LADDER.dark.length, 4);
 });
-for (const theme of ['light', 'dark'] as const) {
-	test(`${theme} accent (default theme): filled levels >= 3:1, increasing, distinct`, () => {
-		const t = DEFAULT_THEME[theme];
-		const fills = [t.accent, ...pcts.map((p) => mix(t.accent, p, t.text))];
+for (const [name, t] of Object.entries(THEMES)) {
+	test(`accent, ${name}: each level >= 3:1 vs background, adjacent levels >= 1.35:1`, () => {
+		const [, c, h] = hexToOklch(t.accent);
+		const fills = (t.dark ? LADDER.dark : LADDER.light).map((L) => oklchToHex(L, c, h));
 		let prev = 0;
 		fills.forEach((f, i) => {
-			const c = contrast(f, t.bg);
-			assert.ok(c >= 3, `level ${i + 1} ${f} only ${c.toFixed(2)}:1`);
-			assert.ok(c > prev, `level ${i + 1} not stronger`);
-			if (i > 0) assert.ok(contrast(f, fills[i - 1] as string) >= 1.25, `levels ${i}/${i + 1} too similar`);
-			prev = c;
+			const vsBg = contrast(f, t.bg);
+			assert.ok(vsBg >= 3, `level ${i + 1} ${f} only ${vsBg.toFixed(2)}:1`);
+			assert.ok(vsBg > prev, `level ${i + 1} not stronger`);
+			if (i > 0) assert.ok(contrast(f, fills[i - 1] as string) >= 1.35, `levels ${i}/${i + 1} only ${contrast(f, fills[i - 1] as string).toFixed(2)}:1`);
+			prev = vsBg;
 		});
 	});
 }

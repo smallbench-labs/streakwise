@@ -33,9 +33,9 @@ view: year
 
 | Option | Values | Default |
 |---|---|---|
-| `habits` | comma-separated frontmatter properties (case-insensitive) | default habit from settings |
-| `view` | `year`, `ytd`, `quarter`, `month`, `week` | `year` |
-| `date` / `year` | `YYYY-MM-DD` / `YYYY`, which period to show. Ignored by `view: ytd`, which always shows 1 January to today of the current year | today |
+| `habits` | one frontmatter property (case-insensitive); several, comma-separated: Pro, planned | default habit from settings |
+| `view` | `year` (`ytd`, `quarter`, `month`, `week`: Pro, planned) | `year` |
+| `date` / `year` | `YYYY-MM-DD` / `YYYY`, which year to show | today |
 | `colors` | `accent`, `green`, `blue`, `purple`, `orange` | from settings (`accent`) |
 | `max` | value shown in the darkest colour | largest value in range |
 | `title` | any text | none |
@@ -69,10 +69,13 @@ The command **Insert heatmap block** adds a starter block.
 
 ## Development
 
+The free build makes no network requests: the license code for the planned Pro version is removed from `main.js` at build time (`FREE_BUILD=true`), and `npm test` checks the bundle for it.
+
 ```bash
 npm install
 npm run build   # type-check + bundle to main.js
-npm test        # unit tests (date/value/streak/scale/config, settings validation, contrast, licensing with mocked HTTP) + a check of the shipped free bundle (FREE_BUILD=true)
+npm test        # unit tests (dates, values, streaks, settings validation, colour contrast) + a check that the
+                # shipped free bundle (FREE_BUILD=true) contains no license or network code
 npm run lint
 ```
 

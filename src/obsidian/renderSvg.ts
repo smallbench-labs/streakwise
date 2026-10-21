@@ -46,11 +46,12 @@ export function renderStats(parent: HTMLElement, h: HabitHeatmap) {
 const isCalendar = (m: HeatmapModel) => m.view === 'month' || m.view === 'week';
 
 /** Draws one habit's grid into `parent` at (x, y). Returns its size. */
-function drawGrid(parent: Element, model: HeatmapModel, habit: HabitHeatmap, x: number, y: number): { width: number; height: number } {
+/** `weekdayLabels: false` leaves out the Mon/Wed/Fri column (on screen it is a separate, non-scrolling SVG). */
+function drawGrid(parent: Element, model: HeatmapModel, habit: HabitHeatmap, x: number, y: number, weekdayLabels = true): { width: number; height: number } {
 	const calendar = isCalendar(model);
 	const cell = calendar ? 30 : 10;
 	const step = cell + (calendar ? 4 : 2);
-	const left = calendar ? 0 : 28;
+	const left = calendar || !weekdayLabels ? 0 : 28;
 	const order = Array.from({ length: 7 }, (_, i) => (model.weekStart + i) % 7);
 	const g = el('g', { transform: `translate(${x + left}, ${y})` }, parent);
 	const weeks = habit.weeks;
@@ -71,7 +72,7 @@ function drawGrid(parent: Element, model: HeatmapModel, habit: HabitHeatmap, x: 
 		const ref = first ?? (col === 0 ? week.find(Boolean) : undefined);
 		if (ref) text(g, col * step, 10, MONTHS[parseKey(ref.day).month - 1] ?? '', 'sw-axis');
 	});
-	order.forEach((weekday, row) => {
+	if (weekdayLabels) order.forEach((weekday, row) => {
 		if (weekday === 1 || weekday === 3 || weekday === 5) {
 			text(parent, x, y + 14 + row * step + cell, WEEKDAYS[weekday] ?? '', 'sw-axis');
 		}
@@ -115,8 +116,19 @@ function scaled(svg: SVGSVGElement): SVGSVGElement {
 /** On-screen grid for one habit. Title, stats and legend are HTML around it so they wrap (S-11). */
 export function renderGridSvg(model: HeatmapModel, habit: HabitHeatmap, palette: Palette): SVGSVGElement {
 	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, role: 'img', 'aria-label': statsLine(habit) });
-	const size = drawGrid(svg, model, habit, 1, 1);
+	const size = drawGrid(svg, model, habit, 1, 1, isCalendar(model));
 	return scaled(sized(svg, size.width + 2, size.height + 2));
+}
+
+/** Fixed Mon/Wed/Fri column left of the scrolling yearly grid (null for calendar layouts). */
+export function renderWeekdayAxis(model: HeatmapModel): SVGSVGElement | null {
+	if (isCalendar(model)) return null;
+	const svg = el('svg', { class: 'sw-svg sw-weekday-axis', 'aria-hidden': 'true' });
+	const order = Array.from({ length: 7 }, (_, i) => (model.weekStart + i) % 7);
+	order.forEach((weekday, row) => {
+		if (weekday === 1 || weekday === 3 || weekday === 5) text(svg, 1, 1 + 14 + row * 12 + 10, WEEKDAYS[weekday] ?? '', 'sw-axis');
+	});
+	return scaled(sized(svg, 28, 14 + 7 * 12 + 2));
 }
 
 /** The five legend swatches (no text; "Less"/"More" are HTML). */
