@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+// Obsidian 1.14 default --interactive-accent (light / dark), measured with getComputedStyle.
+const ACCENT_LIGHT = '#9873f7', ACCENT_DARK = '#8a5cf5';
 const BG = { light: '#ffffff', dark: '#1e1e1e' }; // Obsidian default --background-primary
 
 function luminance(hex: string): number {
@@ -23,11 +25,12 @@ const rules = [...css.matchAll(/^(\.theme-dark )?\.sw-palette-(\w+) \{([^}]*)\}/
 	vars: Object.fromEntries([...(m[3] ?? '').matchAll(/--(sw-[\w-]+):\s*(#[0-9a-f]{6})/gi)].map((v) => [v[1], v[2]])),
 }));
 
-test('all 4 palettes defined for light and dark', () => {
-	assert.equal(rules.length, 8);
+const fixedRules = rules.filter((r) => r.name !== 'accent');
+test('all 4 fixed palettes defined for light and dark', () => {
+	assert.equal(fixedRules.length, 8);
 });
 
-for (const r of rules) {
+for (const r of fixedRules) {
 	test(`${r.theme} ${r.name}: filled levels >= 3:1 vs background, increasing, day numbers >= 4.5:1`, () => {
 		let prev = 0;
 		for (let l = 1; l <= 4; l++) {
@@ -46,3 +49,35 @@ for (const r of rules) {
 test('empty cells have a visible border', () => {
 	assert.match(css, /\.sw-cell\.sw-l0 \{[^}]*stroke: var\(--text-muted\)(?![^}]*stroke-opacity)/);
 });
+
+// --- Accent palette (default): color-mix of the theme accent with --text-normal, checked with Obsidian's
+// default theme values (measured in Obsidian 1.14 under Xvfb; see obsidian-internal/uiux-r2-fixes.md).
+const DEFAULT_THEME = {
+	light: { bg: '#ffffff', accent: ACCENT_LIGHT, text: '#222222', onAccent: '#ffffff' },
+	dark: { bg: '#1c1c1c', accent: ACCENT_DARK, text: '#dadada', onAccent: '#ffffff' },
+};
+const hex = (n: number[]) => '#' + n.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('');
+const rgb = (h: string) => [0, 2, 4].map((i) => parseInt(h.slice(1 + i, 3 + i), 16));
+/** CSS color-mix(in srgb, a p%, b). */
+const mix = (a: string, p: number, b: string) => { const x = rgb(a), y = rgb(b); return hex(x.map((c, i) => c * p + (y[i] ?? 0) * (1 - p))); };
+const accentRule = css.match(/\.sw-palette-accent \{([^}]*)\}/)?.[1] ?? '';
+const pcts = [...accentRule.matchAll(/--sw-(\d): color-mix\(in srgb, var\(--interactive-accent\) (\d+)%, var\(--text-normal\)\)/g)].map((m) => Number(m[2]) / 100);
+
+test('accent palette defined with color-mix for levels 2-4', () => {
+	assert.match(accentRule, /--sw-1: var\(--interactive-accent\)/);
+	assert.equal(pcts.length, 3);
+});
+for (const theme of ['light', 'dark'] as const) {
+	test(`${theme} accent (default theme): filled levels >= 3:1, increasing, distinct`, () => {
+		const t = DEFAULT_THEME[theme];
+		const fills = [t.accent, ...pcts.map((p) => mix(t.accent, p, t.text))];
+		let prev = 0;
+		fills.forEach((f, i) => {
+			const c = contrast(f, t.bg);
+			assert.ok(c >= 3, `level ${i + 1} ${f} only ${c.toFixed(2)}:1`);
+			assert.ok(c > prev, `level ${i + 1} not stronger`);
+			if (i > 0) assert.ok(contrast(f, fills[i - 1] as string) >= 1.25, `levels ${i}/${i + 1} too similar`);
+			prev = c;
+		});
+	});
+}

@@ -7,13 +7,14 @@ import { DayKey, ViewKind, WeekStart, isValidKey, toKey } from './dates';
  *   view: month          (year | ytd | quarter | month | week)
  *   date: 2026-10-01     (which month/quarter/week to show; default today)
  *   year: 2025           (shortcut for date: 2025-01-01)
- *   colors: blue         (green | blue | purple | orange)
+ *   colors: blue         (accent | green | blue | purple | orange)
  *   max: 10              (value that gets the darkest colour)
  *   title: My habits
  *   weekstart: monday    (monday | sunday)
  */
 
-export const PALETTES = ['green', 'blue', 'purple', 'orange'] as const;
+/** 'accent' follows the theme's accent colour (default); the others are fixed ramps. */
+export const PALETTES = ['accent', 'green', 'blue', 'purple', 'orange'] as const;
 export type Palette = (typeof PALETTES)[number];
 const VIEWS: ViewKind[] = ['year', 'ytd', 'quarter', 'month', 'week'];
 

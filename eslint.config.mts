@@ -21,6 +21,8 @@ export default defineConfig(
 		languageOptions: {
 			globals: {
 				...globals.browser,
+				// Set by esbuild `define` (see esbuild.config.mjs, src/globals.d.ts).
+				FREE_BUILD: 'readonly',
 			},
 			parserOptions: {
 				projectService: {

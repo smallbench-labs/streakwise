@@ -1,10 +1,10 @@
-import { MarkdownRenderChild, Notice, moment } from 'obsidian';
+import { MarkdownRenderChild, Notice, moment, setIcon } from 'obsidian';
 import type StreakwisePlugin from '../main';
 import { applyFreeLimits, parseBlockConfig } from '../core/blockConfig';
 import { buildHeatmapModel } from '../core/heatmapModel';
 import { duplicatesInRange } from '../core/dailyEntries';
 import { habitValues, resolveDailySource } from './dataSource';
-import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, statsLine } from './renderSvg';
+import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderStats } from './renderSvg';
 import type { HeatmapModel } from '../core/heatmapModel';
 import type { Palette } from '../core/blockConfig';
 import { savePngToVault, svgToPng } from './exportPng';
@@ -30,6 +30,16 @@ export class HeatmapBlock extends MarkdownRenderChild {
 	}
 
 	render() {
+		try {
+			this.renderUnsafe();
+		} catch (e) {
+			// S-25: never leave a blank block; say why.
+			this.containerEl.empty();
+			this.containerEl.createDiv({ cls: 'sw-message sw-error', text: `Streakwise: could not render this block (${e instanceof Error ? e.message : String(e)})` });
+		}
+	}
+
+	private renderUnsafe() {
 		const { plugin } = this;
 		const s = plugin.settings;
 		const root = this.containerEl;
@@ -62,17 +72,22 @@ export class HeatmapBlock extends MarkdownRenderChild {
 
 		for (const err of parsed.errors) root.createDiv({ cls: 'sw-message sw-error', text: err });
 		if (locked.length) {
-			root.createDiv({
-				cls: 'sw-message sw-locked',
-				text: `${locked.join(', ')}: ${proSoon ? 'Streakwise Pro — coming soon' : 'Streakwise Pro feature'}. Showing the free yearly view of "${config.habits[0]}".`,
+			// Callout only, no fallback grid: a second copy of the yearly heatmap in the same note is noise.
+			const callout = root.createDiv({ cls: 'sw-message sw-locked' });
+			setIcon(callout.createSpan({ cls: 'sw-locked-icon', attr: { 'aria-hidden': 'true' } }), 'lock');
+			const what = locked.join(' and ');
+			const verb = locked.length > 1 ? 'are' : 'is';
+			callout.createSpan({
+				text: `${what} ${verb} ${proSoon ? 'a Pro feature (coming soon)' : 'a Streakwise Pro feature'}. `
+					+ 'The free version shows one habit per block with "view: year".',
 			});
+			return;
 		}
 
+		// Empty state: one hint card per note, no empty grid. --text-error stays for real errors only.
 		if (index.byDay.size === 0) {
-			root.createDiv({
-				cls: 'sw-message sw-error',
-				text: `No daily notes found in "${source.folder || '/'}" (and its subfolders) with date format ${source.format}, from ${source.origin}. Check the daily notes location in Streakwise settings.`,
-			});
+			this.renderEmptyState(source.folder, source.format);
+			return;
 		}
 		const dups = duplicatesInRange(index.duplicates, model.range);
 		if (dups.length) {
@@ -89,22 +104,62 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		const palette = config.palette ?? s.palette;
 		if (config.title) root.createDiv({ cls: 'sw-title', text: config.title });
 		for (const habit of model.habits) {
-			root.createDiv({ cls: 'sw-stats', text: statsLine(habit) });
-			root.createDiv({ cls: 'sw-scroll' }).appendChild(renderGridSvg(model, habit, palette));
+			renderStats(root, habit);
+			const scroll = root.createDiv({ cls: 'sw-scroll' });
+			scroll.appendChild(renderGridSvg(model, habit, palette));
+			this.scrollToToday(scroll, today);
 		}
-		const legend = root.createDiv({ cls: 'sw-legend' });
-		legend.createSpan({ text: 'Less' });
+		const legend = root.createDiv({ cls: 'sw-legend', attr: { role: 'img', 'aria-label': 'Colour scale: lighter is less, stronger is more' } });
+		legend.createSpan({ text: 'Less', attr: { 'aria-hidden': 'true' } });
 		legend.appendChild(renderLegendSwatches(palette));
-		legend.createSpan({ text: 'More' });
+		legend.createSpan({ text: 'More', attr: { 'aria-hidden': 'true' } });
 		this.exportInput = { model, palette, title: config.title };
 
 		// No export on blocks with config errors or locked features: the image would not match the request.
-		if (parsed.errors.length || locked.length) return;
+		// Free build (or no Polar setup): no export button at all.
+		if (FREE_BUILD || proSoon || parsed.errors.length || locked.length) return;
 		const toolbar = root.createDiv({ cls: 'sw-toolbar' });
-		const exportBtn = toolbar.createEl('button', { text: isPro ? 'Export PNG' : proSoon ? 'Export PNG (Pro, coming soon)' : 'Export PNG (Pro)' });
-		exportBtn.setAttr('aria-label', isPro ? 'Export this heatmap as a PNG into your vault' : proSoon ? 'PNG export is a Streakwise Pro feature, coming soon' : 'Exporting PNG requires Streakwise Pro');
+		const exportBtn = toolbar.createEl('button', { text: isPro ? 'Export PNG' : 'Export PNG (Pro)' });
+		exportBtn.setAttr('aria-label', isPro ? 'Export this heatmap as a PNG into your vault' : 'Exporting PNG requires Streakwise Pro');
 		exportBtn.disabled = !isPro;
 		exportBtn.onclick = () => { void this.exportPng(config.view, today); };
+	}
+
+	/** Hint card shown once per note; later blocks in the same note get a one-line pointer. */
+	private renderEmptyState(folder: string, format: string) {
+		const root = this.containerEl;
+		const view = root.closest('.markdown-preview-view, .markdown-source-view, .markdown-rendered');
+		const first = view?.querySelector('.sw-empty-card');
+		if (first && !root.contains(first)) {
+			root.createDiv({ cls: 'sw-message', text: 'No daily notes found yet (see the first heatmap in this note).' });
+			return;
+		}
+		const card = root.createDiv({ cls: 'sw-empty-card' });
+		card.createDiv({ cls: 'sw-empty-title', text: 'No daily notes found yet' });
+		card.createDiv({
+			cls: 'sw-empty-desc',
+			text: `Streakwise looks in "${folder || '/'}" and its subfolders for notes named like ${format}. Create a daily note, or change the location in settings.`,
+		});
+		const btn = card.createEl('button', { text: 'Open Streakwise settings' });
+		btn.onclick = () => { this.plugin.openSettings(); };
+	}
+
+	/** Narrow panes: right-align today's column and show fades on edges that can scroll. */
+	private scrollToToday(scroll: HTMLElement, today: string) {
+		const update = () => {
+			const max = scroll.scrollWidth - scroll.clientWidth;
+			scroll.toggleClass('sw-fade-left', scroll.scrollLeft > 1);
+			scroll.toggleClass('sw-fade-right', scroll.scrollLeft < max - 1);
+		};
+		scroll.addEventListener('scroll', update, { passive: true });
+		window.requestAnimationFrame(() => {
+			const cell = scroll.querySelector(`rect[data-day="${today}"]`);
+			if (cell && scroll.scrollWidth > scroll.clientWidth) {
+				const c = cell.getBoundingClientRect(), b = scroll.getBoundingClientRect();
+				scroll.scrollLeft += c.right - b.right + 16;
+			}
+			update();
+		});
 	}
 
 	async exportPng(view: string, today: string): Promise<string | null> {
