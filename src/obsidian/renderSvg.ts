@@ -29,6 +29,19 @@ export function statsLine(h: HabitHeatmap): string {
 	return `${h.habit} · current streak ${s.currentStreak} · longest ${s.longestStreak} · ${s.doneDays}/${s.elapsedDays} days`;
 }
 
+/** Stats as HTML: streak part and days part are separate lines in narrow panes; number+unit never split. */
+export function renderStats(parent: HTMLElement, h: HabitHeatmap) {
+	const s = h.stats;
+	const row = parent.createDiv({ cls: 'sw-stats', attr: { 'aria-label': statsLine(h) } });
+	const streak = row.createSpan({ cls: 'sw-stats-streak' });
+	streak.appendText(`${h.habit} · `);
+	streak.createSpan({ cls: 'sw-nowrap', text: `current streak ${s.currentStreak}` });
+	streak.appendText(' · ');
+	streak.createSpan({ cls: 'sw-nowrap', text: `longest ${s.longestStreak}` });
+	row.createSpan({ cls: 'sw-stats-sep', text: ' · ' });
+	row.createSpan({ cls: 'sw-stats-days sw-nowrap', text: `${s.doneDays}/${s.elapsedDays} days` });
+}
+
 /** Calendar layout (rows = weeks) for month/week; GitHub-style layout (columns = weeks) otherwise. */
 const isCalendar = (m: HeatmapModel) => m.view === 'month' || m.view === 'week';
 
@@ -56,11 +69,11 @@ function drawGrid(parent: Element, model: HeatmapModel, habit: HabitHeatmap, x: 
 	weeks.forEach((week, col) => {
 		const first = week.find((c) => c && parseKey(c.day).day === 1);
 		const ref = first ?? (col === 0 ? week.find(Boolean) : undefined);
-		if (ref) text(g, col * step, 9, MONTHS[parseKey(ref.day).month - 1] ?? '', 'sw-axis');
+		if (ref) text(g, col * step, 10, MONTHS[parseKey(ref.day).month - 1] ?? '', 'sw-axis');
 	});
 	order.forEach((weekday, row) => {
 		if (weekday === 1 || weekday === 3 || weekday === 5) {
-			text(parent, x, y + 14 + row * step + cell - 1, WEEKDAYS[weekday] ?? '', 'sw-axis');
+			text(parent, x, y + 14 + row * step + cell, WEEKDAYS[weekday] ?? '', 'sw-axis');
 		}
 	});
 	weeks.forEach((week, col) => week.forEach((c, row) => {
@@ -86,18 +99,32 @@ function sized(svg: SVGSVGElement, width: number, height: number) {
 	return svg;
 }
 
+/**
+ * On screen the SVG is sized in em of --font-ui-small (13px by default), so cells and labels
+ * scale with Obsidian's font-size setting. Export keeps pixel sizes.
+ */
+function scaled(svg: SVGSVGElement): SVGSVGElement {
+	const w = Number(svg.getAttribute('width')), h = Number(svg.getAttribute('height'));
+	svg.removeAttribute('width');
+	svg.removeAttribute('height');
+	svg.setCssProps({ '--sw-w': `${(w / 13).toFixed(3)}em`, '--sw-h': `${(h / 13).toFixed(3)}em` });
+	svg.addClass('sw-scaled');
+	return svg;
+}
+
 /** On-screen grid for one habit. Title, stats and legend are HTML around it so they wrap (S-11). */
 export function renderGridSvg(model: HeatmapModel, habit: HabitHeatmap, palette: Palette): SVGSVGElement {
 	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, role: 'img', 'aria-label': statsLine(habit) });
 	const size = drawGrid(svg, model, habit, 1, 1);
-	return sized(svg, size.width + 2, size.height + 2);
+	return scaled(sized(svg, size.width + 2, size.height + 2));
 }
 
 /** The five legend swatches (no text; "Less"/"More" are HTML). */
 export function renderLegendSwatches(palette: Palette): SVGSVGElement {
 	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, 'aria-hidden': 'true' });
-	for (let l = 0; l <= LEVELS; l++) el('rect', { x: l * 14 + 0.5, y: 0.5, width: 11, height: 11, rx: 2, class: `sw-cell sw-l${l}` }, svg);
-	return sized(svg, (LEVELS + 1) * 14, 12);
+	// Same size and 2px gap as the grid cells.
+	for (let l = 0; l <= LEVELS; l++) el('rect', { x: l * 12 + 0.5, y: 0.5, width: 9, height: 9, rx: 2, class: `sw-cell sw-l${l}` }, svg);
+	return scaled(sized(svg, (LEVELS + 1) * 12, 10));
 }
 
 /**

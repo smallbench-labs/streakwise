@@ -1,12 +1,19 @@
 /* Streakwise: theme-aware heatmap colours. Level 0 = not done; 1..4 = increasing intensity.
    Sequential ramps: lightness changes with the level, so levels do not rely on hue alone. */
 
-.sw-block { margin: 0.5em 0; }
-.sw-scroll { overflow-x: auto; }
+.sw-block { margin: var(--size-4-2) 0; container-type: inline-size; }
+.sw-scroll { overflow-x: auto; font-size: var(--font-ui-small); }
+/* Edge fades show that the grid can scroll (set by heatmapBlock.scrollToToday). */
+.sw-scroll.sw-fade-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.sw-scroll.sw-fade-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent); }
+.sw-scroll.sw-fade-left.sw-fade-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .sw-svg { display: block; font-family: var(--font-interface); }
+/* On-screen SVGs are sized in em of --font-ui-small, so cells and labels follow Obsidian's font size. */
+.sw-svg.sw-scaled { width: var(--sw-w); height: var(--sw-h); }
+/* SVG text sizes are in SVG units: 10 units = --font-ui-smaller-ish at default size, scaled with the grid. */
 .sw-svg-title { font-size: 14px; font-weight: 600; fill: var(--text-normal); }
 .sw-svg-stats { font-size: 12px; fill: var(--text-normal); }
-.sw-axis { font-size: 9px; fill: var(--text-muted); }
+.sw-axis { font-size: 10px; fill: var(--text-muted); }
 .sw-daynum { font-size: 11px; fill: var(--text-normal); pointer-events: none; }
 .sw-daynum.sw-on-l1 { fill: var(--sw-on-1); }
 .sw-daynum.sw-on-l2 { fill: var(--sw-on-2); }
@@ -21,6 +28,16 @@
 
 /* S-12: every filled level has >= 3:1 contrast against the default light (#ffffff) and dark (#1e1e1e)
    backgrounds; --sw-on-N is the day-number colour for that level (>= 4.5:1). Checked by tests/contrast.test.ts. */
+/* Accent (default): follows the theme's --interactive-accent. Level 1 is the accent itself; higher levels mix in
+   --text-normal, so they get darker in light themes and brighter in dark themes. Checked by tests/contrast.test.ts
+   with Obsidian's default accent. */
+.sw-palette-accent {
+	--sw-1: var(--interactive-accent);
+	--sw-2: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal));
+	--sw-3: color-mix(in srgb, var(--interactive-accent) 60%, var(--text-normal));
+	--sw-4: color-mix(in srgb, var(--interactive-accent) 40%, var(--text-normal));
+	--sw-on-1: var(--text-on-accent); --sw-on-2: var(--background-primary); --sw-on-3: var(--background-primary); --sw-on-4: var(--background-primary);
+}
 .sw-palette-green { --sw-1: #4c9c61; --sw-on-1: #000000; --sw-2: #2f7f47; --sw-on-2: #ffffff; --sw-3: #1c6332; --sw-on-3: #ffffff; --sw-4: #0b4520; --sw-on-4: #ffffff; }
 .sw-palette-blue { --sw-1: #5b8fc7; --sw-on-1: #000000; --sw-2: #3b70b0; --sw-on-2: #ffffff; --sw-3: #235390; --sw-on-3: #ffffff; --sw-4: #0d3366; --sw-on-4: #ffffff; }
 .sw-palette-purple { --sw-1: #9079c4; --sw-on-1: #000000; --sw-2: #7459ad; --sw-on-2: #ffffff; --sw-3: #583d93; --sw-on-3: #ffffff; --sw-4: #3a1f70; --sw-on-4: #ffffff; }
@@ -35,15 +52,35 @@
 .sw-cell.sw-l3 { fill: var(--sw-3); }
 .sw-cell.sw-l4 { fill: var(--sw-4); }
 
-.sw-title { font-weight: 600; font-size: var(--font-ui-medium); overflow-wrap: anywhere; margin-bottom: 0.2em; }
-.sw-stats { font-size: var(--font-ui-small); overflow-wrap: anywhere; margin-top: 0.3em; }
-.sw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: 0.2em; }
+.sw-title { font-weight: var(--font-semibold); font-size: var(--font-ui-medium); color: var(--text-normal); overflow-wrap: anywhere; margin-bottom: var(--size-4-1); }
+.sw-stats { font-size: var(--font-ui-small); color: var(--text-normal); margin-bottom: var(--size-4-1); }
+.sw-nowrap { white-space: nowrap; }
+/* Narrow panes: streak part and days part on two lines instead of breaking inside "171/294 days". */
+@container (max-width: 420px) {
+	.sw-stats-streak, .sw-stats-days { display: block; }
+	.sw-stats-sep { display: none; }
+}
+.sw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: var(--size-4-1); }
 .sw-legend svg { flex: none; }
-.sw-legend span { white-space: nowrap; padding: 0 2px; }
-.sw-message { font-size: var(--font-ui-small); color: var(--text-muted); margin-bottom: 0.4em; }
+.sw-legend span { white-space: nowrap; }
+.sw-message { font-size: var(--font-ui-small); color: var(--text-muted); margin-bottom: var(--size-4-2); }
 .sw-message.sw-error { color: var(--text-error); }
-.sw-message.sw-locked { color: var(--text-accent); }
-.sw-toolbar { margin-top: 0.4em; }
+.sw-message.sw-locked {
+	display: flex; align-items: flex-start; gap: var(--size-4-2);
+	color: var(--text-muted); background: var(--background-secondary);
+	border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s);
+	padding: var(--size-4-2) var(--size-4-3);
+}
+.sw-locked-icon { display: flex; flex: none; color: var(--text-muted); }
+.sw-locked-icon svg { width: var(--icon-s); height: var(--icon-s); }
+.sw-empty-card {
+	background: var(--background-secondary); border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m); padding: var(--size-4-3); color: var(--text-muted); font-size: var(--font-ui-small);
+}
+.sw-empty-title { color: var(--text-normal); font-weight: var(--font-semibold); font-size: var(--font-ui-medium); margin-bottom: var(--size-4-1); }
+.sw-empty-desc { margin-bottom: var(--size-4-2); }
+.sw-swatch-preview { display: flex; align-items: center; font-size: var(--font-ui-small); margin-right: var(--size-4-2); }
+.sw-toolbar { margin-top: var(--size-4-2); }
 
 @media (forced-colors: active) {
 	.sw-cell { stroke: CanvasText; }

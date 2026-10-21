@@ -4,6 +4,7 @@ import { EMPTY_LICENSE, LicenseCache } from './license/types';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
 import { SourceSettings, resolveDailySource } from './obsidian/dataSource';
+import { renderLegendSwatches } from './obsidian/renderSvg';
 
 export interface StreakwiseSettings extends SourceSettings {
 	defaultHabit: string;
@@ -19,7 +20,7 @@ export const DEFAULT_SETTINGS: StreakwiseSettings = {
 	customFormat: 'YYYY-MM-DD',
 	defaultHabit: '',
 	weekStart: 1,
-	palette: 'green',
+	palette: 'accent',
 	exportFolder: 'Streakwise exports',
 	license: { ...EMPTY_LICENSE },
 };
@@ -61,7 +62,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				.onChange((v) => { void this.update((x) => { x.customFolder = v; }); }));
 		new Setting(containerEl)
 			.setName('Custom date format')
-			.setDesc('Moment.js format of the note name, e.g. YYYY-MM-DD or YYYY/MM/YYYY-MM-DD.')
+			.setDesc('Moment.js format of the note name, for example YYYY-MM-DD, or YYYY/MM/YYYY-MM-DD for notes in year/month folders.')
 			.addText((t) => t.setPlaceholder('YYYY-MM-DD').setValue(s.customFormat)
 				.onChange((v) => { void this.update((x) => { x.customFormat = v; }); }));
 
@@ -74,20 +75,34 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				.onChange((v) => { void this.update((x) => { x.defaultHabit = v.trim(); }); }));
 		new Setting(containerEl)
 			.setName('Week starts on')
+			.setDesc('First row of the yearly heatmap. A block can override it with "weekstart:".')
 			.addDropdown((d) => d.addOption('1', 'Monday').addOption('0', 'Sunday')
 				.setValue(String(s.weekStart))
 				.onChange((v) => { void this.update((x) => { x.weekStart = v === '0' ? 0 : 1; }); }));
-		new Setting(containerEl)
+		const colors = new Setting(containerEl)
 			.setName('Colors')
-			.addDropdown((d) => {
-				for (const p of PALETTES) d.addOption(p, p.charAt(0).toUpperCase() + p.slice(1));
-				d.setValue(s.palette).onChange((v) => { void this.update((x) => { x.palette = v as Palette; }); });
+			.setDesc('Accent follows your theme. A block can override it with "colors:".');
+		const preview = colors.controlEl.createDiv({ cls: 'sw-swatch-preview', attr: { 'aria-hidden': 'true' } });
+		const drawPreview = (p: Palette) => {
+			preview.empty();
+			preview.appendChild(renderLegendSwatches(p));
+		};
+		drawPreview(s.palette);
+		colors.addDropdown((d) => {
+			for (const p of PALETTES) d.addOption(p, p === 'accent' ? 'Accent (follow theme)' : p.charAt(0).toUpperCase() + p.slice(1));
+			d.setValue(s.palette).onChange((v) => {
+				drawPreview(v as Palette);
+				void this.update((x) => { x.palette = v as Palette; });
 			});
-		new Setting(containerEl)
-			.setName('PNG export folder')
-			.setDesc(this.plugin.license.isConfigured() ? 'Pro. Exported images are saved inside your vault.' : 'Pro (coming soon). Exported images are saved inside your vault.')
-			.addText((t) => t.setValue(s.exportFolder)
-				.onChange((v) => { void this.update((x) => { x.exportFolder = v.trim(); }); }));
+		});
+		// PNG export is Pro-only; the free build has no export, so no setting either.
+		if (!FREE_BUILD && this.plugin.license.isConfigured()) {
+			new Setting(containerEl)
+				.setName('PNG export folder')
+				.setDesc('Pro. Exported images are saved inside your vault.')
+				.addText((t) => t.setValue(s.exportFolder)
+					.onChange((v) => { void this.update((x) => { x.exportFolder = v.trim(); }); }));
+		}
 
 		// --- Pro ---
 		this.displayLicense(containerEl);
@@ -100,8 +115,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			new Setting(containerEl).setName('Pro').setHeading();
 			new Setting(containerEl)
 				.setName('Streakwise Pro — coming soon')
-				.setDesc('Free version: yearly heatmap of one habit. Pro features (month, week, quarter and '
-					+ 'year-to-date views, multiple habits and PNG export) are coming soon.');
+				.setDesc('Free version: yearly heatmap of one habit. Planned for Pro: month, week, quarter and '
+					+ 'year-to-date views, multiple habits and PNG export.');
 			return;
 		}
 		this.keyDraft = lic.state.key;

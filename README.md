@@ -1,23 +1,24 @@
 # Streakwise
 
-See at a glance whether you kept your habits. Streakwise turns the properties you already log in your daily notes, like `exercise: true` or `reading: 30 min`, into a heatmap with your current and longest streak.
+Turn the habit properties already in your daily notes, like `exercise: 30 min` or `reading: true`, into a GitHub-style yearly heatmap with your current and longest streak, with no new note format to learn.
 
-For anyone who tracks habits in daily notes and wants a visual check without adding a separate app. The yearly heatmap is free and works offline. Pro features coming soon: more views, multiple habits per block, and PNG export.
+For anyone who tracks habits in daily notes and wants a visual check without adding a separate app. Free, offline, no account.
 
-![Free yearly heatmap, and a month view (Pro, coming soon) falling back to the yearly view](shots/10_free_yearly_and_locked_month.png)
+![Yearly heatmap of an exercise habit with current and longest streak](shots/10_free_yearly_heatmap.png)
+
+![Typing "exercise: 45 min" in today's daily note adds a cell to the heatmap](shots/free_heatmap_updates.gif)
 
 ## Features
 
-**Free (fully offline, no account, no network):**
-- Yearly heatmap of one habit, with current streak, longest streak and days done.
-- Light and dark theme support. 4 colour palettes (green, blue, purple, orange); higher values get darker in light themes and brighter in dark themes, so levels can be read by lightness, not hue alone.
+- Yearly heatmap of one habit per block, with current streak, longest streak and days done.
+- Several blocks in one note, each with its own habit and colours.
+- Follows your theme: the default "Accent" colours use your theme's accent colour; 4 fixed palettes (green, blue, purple, orange) are also available. Higher values get darker in light themes and brighter in dark themes, so levels can be read by lightness, not hue alone.
+- Works in narrow panes: the grid scrolls to today, and the title and streak line wrap.
+- Fully offline: no account, no network.
 
-**Streakwise Pro (coming soon):**
-- Month, week, quarter and year-to-date views.
-- Several habits in one block.
-- Export a heatmap as PNG into your vault (generated locally, no upload).
+**Planned for Streakwise Pro:** month, week, quarter and year-to-date views; several habits in one block; PNG export.
 
-![Dark theme](shots/20_narrow_320px_dark_free.png)
+![Three free heatmap blocks in one note](shots/26_free_multiple_blocks.png)
 
 ## Usage
 
@@ -25,8 +26,8 @@ Add `exercise: true`, `reading: 30 min`, `meditate: yes` (any property name) to 
 
 ````markdown
 ```streakwise
-habits: exercise, reading
-view: month
+habits: exercise
+view: year
 ```
 ````
 
@@ -35,7 +36,7 @@ view: month
 | `habits` | comma-separated frontmatter properties (case-insensitive) | default habit from settings |
 | `view` | `year`, `ytd`, `quarter`, `month`, `week` | `year` |
 | `date` / `year` | `YYYY-MM-DD` / `YYYY`, which period to show. Ignored by `view: ytd`, which always shows 1 January to today of the current year | today |
-| `colors` | `green`, `blue`, `purple`, `orange` | from settings |
+| `colors` | `accent`, `green`, `blue`, `purple`, `orange` | from settings (`accent`) |
 | `max` | value shown in the darkest colour | largest value in range |
 | `title` | any text | none |
 | `weekstart` | `monday`, `sunday` | from settings |
@@ -43,12 +44,12 @@ view: month
 Values:
 - `true/yes/done/x/✅` = done; `false/no/skip` or empty = not done.
 - Numbers are amounts, also with units (`30 min`, `1.5h`). Zero or negative numbers (`-5`) count as not done.
-- Comma: `1,5` is read as a decimal comma (1.5). Groups of exactly three digits are thousands: `1,000` = 1000, `12,500 steps` = 12500.
+- Comma: a comma followed by exactly three digits is a thousands separator (`1,000` = 1000, `12,500 steps` = 12500); any other comma is a decimal comma (`1,5` = 1.5, `1,50` = 1.5, `1,0000` = 1). To avoid ambiguity, write decimals with a dot (`1.50`).
 - A missing daily note or property is shown faded as "no entry".
 
 **Where daily notes are found:** Streakwise follows the folder and date format of the Periodic Notes plugin (daily notes) if enabled, otherwise the core Daily notes plugin, otherwise the folder/format in Streakwise settings. You can force the custom location in settings.
 
-Only notes **inside the daily-notes folder or its subfolders** are counted. A note matches if its path relative to that folder (for formats like `YYYY/MM/YYYY-MM-DD`) or its file name (for notes archived in subfolders, e.g. `Daily/2026/2026-10-17.md`) matches the date format. Notes outside the folder (e.g. `Archive/2026-10-17.md` when the folder is `Daily`) are ignored. If no daily notes are found, the block says so and shows the folder and format it looked for. If two notes still map to the same day (e.g. format `YYYY-M-D` with both `2026-10-7.md` and `2026-10-07.md`), the one with the **shortest path** is used (ties: alphabetical), and blocks whose date range includes that day show which note was ignored.
+Only notes **inside the daily-notes folder or its subfolders** are counted. A note matches if its path relative to that folder (for formats like `YYYY/MM/YYYY-MM-DD`) or its file name (for notes archived in subfolders, e.g. `Daily/2026/2026-10-17.md`) matches the date format. Notes outside the folder (e.g. `Archive/2026-10-17.md` when the folder is `Daily`) are ignored. If no daily notes are found, the note shows one hint card with the folder and format it looked for and a button that opens Streakwise settings. If two notes still map to the same day (e.g. format `YYYY-M-D` with both `2026-10-7.md` and `2026-10-07.md`), the one with the **shortest path** is used (ties: alphabetical), and blocks whose date range includes that day show which note was ignored.
 
 The command **Insert heatmap block** adds a starter block.
 
@@ -71,7 +72,7 @@ The command **Insert heatmap block** adds a starter block.
 ```bash
 npm install
 npm run build   # type-check + bundle to main.js
-npm test        # unit tests for date/value/streak/scale/config logic and licensing (mocked HTTP + clock; free-only build makes no requests)
+npm test        # unit tests (date/value/streak/scale/config, settings validation, contrast, licensing with mocked HTTP) + a check of the shipped free bundle (FREE_BUILD=true)
 npm run lint
 ```
 

@@ -8,7 +8,7 @@
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"lint": "eslint .",
-		"test": "esbuild tests/*.test.ts --bundle --platform=node --format=esm --outdir=.test-build --out-extension:.js=.mjs --define:FREE_BUILD=false --log-level=warning && node --test .test-build/*.mjs"
+		"test": "esbuild tests/*.test.ts --bundle --platform=node --format=esm --outdir=.test-build --out-extension:.js=.mjs --define:FREE_BUILD=false --log-level=warning && node --test .test-build/*.mjs && node --test tests/free-bundle.check.mjs"
 	},
 	"keywords": [],
 	"license": "MIT",

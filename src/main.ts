@@ -6,6 +6,7 @@ import { KeyStore, selectKeyStore } from './license/keyStore';
 import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
 import { DailyNoteIndex } from './obsidian/dataSource';
+import { sanitizeSettings } from './core/settingsSanitize';
 
 export const BLOCK_LANGUAGE = 'streakwise';
 
@@ -62,6 +63,14 @@ export default class StreakwisePlugin extends Plugin {
 		if (!FREE_BUILD) this.app.workspace.onLayoutReady(() => { void this.license.refreshIfDue(); });
 	}
 
+	/** Open this plugin's tab in Obsidian settings (empty-state button). */
+	openSettings() {
+		const setting = (this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } }).setting;
+		if (!setting) return;
+		setting.open();
+		setting.openTabById(this.manifest.id);
+	}
+
 	/** Re-render visible blocks, e.g. after settings change (the folder/format may differ). */
 	refreshAfterSettings() {
 		this.dailyIndex.invalidate();
@@ -80,7 +89,9 @@ export default class StreakwisePlugin extends Plugin {
 
 	async loadSettings() {
 		const data = (await this.loadData()) as Partial<StreakwiseSettings> | null;
-		this.settings = { ...DEFAULT_SETTINGS, ...data, license: { ...DEFAULT_SETTINGS.license, ...data?.license } };
+		const raw = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+		const lic = raw.license && typeof raw.license === 'object' ? raw.license as Partial<StreakwiseSettings['license']> : {};
+		this.settings = { ...DEFAULT_SETTINGS, ...sanitizeSettings(raw, DEFAULT_SETTINGS), license: { ...DEFAULT_SETTINGS.license, ...lic } };
 
 		// Keychain on Obsidian 1.11.4+, data.json on older versions.
 		this.keyStore = FREE_BUILD ? FREE_KEY_STORE : selectKeyStore(this.app);

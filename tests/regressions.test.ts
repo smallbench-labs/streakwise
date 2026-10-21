@@ -55,6 +55,7 @@ test('S-04: thousands separator vs decimal comma', () => {
 	assert.equal(parseHabitValue('1,5h'), 1.5);
 	assert.equal(parseHabitValue('10,25'), 10.25);
 	assert.equal(parseHabitValue('1,0000'), 1);
+	assert.equal(parseHabitValue('1,50'), 1.5); // QA r2: documented in README (not 3 digits => decimal comma)
 });
 
 test('S-05: ytd always shows the current year, ignoring date/year', () => {
