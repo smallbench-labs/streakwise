@@ -547,3 +547,60 @@ test('R2-1: Remove completes locally even if /deactivate never answers', async (
 	assert.equal(mgr.isPro(), false);
 	assert.match(mgr.state.message, /could not be released/);
 });
+
+test('M-01: after portal release, 2nd and 3rd startups stay locked even if Polar would grant the key', async () => {
+	// Extra granted() responses are queued to prove they are never requested.
+	const { mgr, calls, advance } = setup([act('old'), granted(), notFound, granted(), granted(), granted()], { useActivations: true });
+	await mgr.activate('KEY', 'x');
+	advance(DAY);
+	await mgr.onLoad(); // 1st startup after release: validate 404 -> locked
+	assert.equal(mgr.isPro(), false);
+	for (let i = 0; i < 2; i++) { // 2nd and 3rd startups
+		advance(DAY);
+		await mgr.onLoad();
+		assert.equal(mgr.isPro(), false);
+		assert.equal(mgr.state.status, 'invalid');
+		assert.match(mgr.state.message, /Press Activate/);
+	}
+	await mgr.refreshIfDue(); // daily recheck path
+	await mgr.touch();
+	assert.equal(mgr.isPro(), false);
+	assert.equal(calls.length, 3);
+	assert.ok(!calls.slice(2).some((c) => c.url.endsWith('/activate')));
+});
+
+test('M-01: cached valid result without activation id never unlocks (activations on)', async () => {
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', status: 'valid', activationId: null, lastValidatedAt: T0, lastCheckedAt: T0, lastSeenAt: T0 };
+	const { mgr, calls } = setup([granted()], { useActivations: true }, cache);
+	assert.equal(mgr.isPro(), false);
+	await mgr.onLoad();
+	assert.equal(mgr.isPro(), false);
+	assert.equal(calls.length, 0);
+});
+
+test('M-01: activate response without an id does not unlock', async () => {
+	const { mgr } = setup([{ status: 200, json: {} }, granted()], { useActivations: true });
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), false);
+});
+
+test('M-01: pressing Activate after release reserves a slot and unlocks', async () => {
+	const { mgr, advance } = setup([act('old'), granted(), notFound, act('new'), granted()], { useActivations: true });
+	await mgr.activate('KEY', 'x');
+	advance(DAY);
+	await mgr.onLoad();
+	advance(DAY);
+	await mgr.onLoad();
+	await mgr.activate('KEY', 'x');
+	assert.equal(mgr.isPro(), true);
+	assert.equal(mgr.state.activationId, 'new');
+});
+
+test('m-02: offline message does not repeat the offline days sentence', async () => {
+	const { mgr, advance } = setup([granted(), 'throw']);
+	await mgr.activate('KEY', 'x');
+	advance(DAY + 1);
+	await mgr.refreshIfDue();
+	assert.equal(mgr.state.message, 'Could not reach the license server.');
+	assert.ok(!/day/.test(mgr.state.message));
+});

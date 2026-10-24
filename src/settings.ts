@@ -6,6 +6,7 @@ import { BuyGate } from './license/buyGate';
 import { obsidianHttpGetJson } from './license/obsidianHttp';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
+import { dayCount } from './core/plural';
 import { SourceSettings, resolveDailySource } from './obsidian/dataSource';
 import { renderLegendSwatches } from './obsidian/renderSvg';
 import { hasDeclarativeSettings } from './settingsCompat';
@@ -224,7 +225,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		if (!FREE_BUILD && lic.isConfigured()) {
 			this.keyDraft = lic.state.key;
 			const status = lic.isPro()
-				? `Pro is active. Works offline for ${lic.graceDaysLeft()} more day(s).`
+				? `Pro is active. Works offline for ${dayCount(lic.graceDaysLeft())} more.`
 				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
@@ -235,9 +236,12 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				// The region check starts only when the Pro panel is actually drawn (never during search indexing).
 				render: needsBuy ? () => { void gate.ensure(() => this.onRegionSettled()); } : undefined,
 			}];
+			// m-01: a user who already has a key (e.g. device released) needs Activate first; Buy Pro goes below it.
+			const keyFirst = !!lic.state.key;
+			const buyRows: Row[] = [];
 			if (needsBuy) {
 				// S-34: hidden until the region is known; shown if the request fails; hidden if blocked.
-				rows.push({
+				buyRows.push({
 					name: 'Get Streakwise Pro',
 					desc: 'Month, week, quarter and YTD views, several habits per block, PNG export. '
 						+ 'US$19 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
@@ -248,6 +252,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 					},
 				});
 			}
+			if (!keyFirst) rows.push(...buyRows);
 			if (this.plugin.deviceCode) {
 				rows.push({
 					name: 'This device',
@@ -280,6 +285,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						}));
 				},
 			});
+			if (keyFirst) rows.push(...buyRows);
 			return { heading: 'Pro license', rows };
 		}
 		// Free-only build: no key field, no purchase link, no network.

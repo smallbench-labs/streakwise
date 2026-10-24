@@ -174,3 +174,18 @@ test('S-39: settings tab shows this device code', () => {
 	assert.ok(row?.desc?.includes('"Obsidian – Linux – a1b2"'));
 	assert.ok(!row?.desc?.includes('…'));
 });
+
+test('m-01: with a stored key that is not Pro, License key (Activate) comes before Buy Pro', () => {
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	(tab as unknown as { plugin: { license: { state: Record<string, unknown> } } }).plugin.license.state = { ...EMPTY_LICENSE, key: 'K', status: 'invalid', message: 'This device was released in the Polar customer portal. Press Activate to use Pro here again.' };
+	const sec = (tab as unknown as { licenseSection(): { rows: { name: string }[] } }).licenseSection();
+	const names = sec.rows.map((r) => r.name);
+	assert.ok(names.indexOf('License key') < names.indexOf('Get Streakwise Pro'));
+});
+
+test('m-01: without a key, Buy Pro stays above License key', () => {
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	const sec = (tab as unknown as { licenseSection(): { rows: { name: string }[] } }).licenseSection();
+	const names = sec.rows.map((r) => r.name);
+	assert.ok(names.indexOf('Get Streakwise Pro') < names.indexOf('License key'));
+});

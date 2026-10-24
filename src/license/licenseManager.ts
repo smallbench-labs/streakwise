@@ -83,6 +83,8 @@ export class LicenseManager {
 		// SEC-1: no key means refreshIfDue()/touch() never run, so a hand-edited data.json
 		// (status 'valid' + future lastValidatedAt/lastSeenAt) would unlock Pro forever offline.
 		if (!c.key || c.status !== 'valid' || c.lastValidatedAt === null) return false;
+		// M-01: with device activations, Pro needs this device's activation id; a key-level grant is not enough.
+		if (this.config.useActivations && !c.activationId) return false;
 		const t = this.effectiveNow();
 		if (c.expiresAt !== null && t >= c.expiresAt) return false;
 		return t - c.lastValidatedAt <= this.config.gracePeriodMs;
@@ -189,6 +191,18 @@ export class LicenseManager {
 	}
 
 	private async validate(): Promise<LicenseCache> {
+		// M-01: without this device's activation id a key-level validate would say "granted" for any
+		// released device. Stay locked (no request) until the user presses Activate (consistent with S-42).
+		if (this.config.useActivations && !this.cache.activationId) {
+			return this.update({
+				...this.cache,
+				status: 'invalid',
+				lastValidatedAt: null,
+				message: this.cache.message.startsWith('This device was released')
+					? this.cache.message
+					: 'This device is not activated. Press Activate to use Pro here.',
+			});
+		}
 		const body: Record<string, unknown> = {
 			key: this.cache.key,
 			organization_id: this.config.organizationId,
@@ -262,7 +276,7 @@ export class LicenseManager {
 			...this.cache,
 			lastCheckedAt: this.effectiveNow(),
 			message: pro
-				? `Could not reach the license server. Works offline for ${this.graceDaysLeft()} more day(s).`
+				? 'Could not reach the license server.'
 				: 'Could not reach the license server. Check your connection and try again.',
 		});
 	}
