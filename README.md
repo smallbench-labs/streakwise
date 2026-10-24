@@ -68,7 +68,7 @@ The command **Insert heatmap block** adds a starter block.
 - No account is required to use the plugin. The **Buy Pro** button opens https://formchime.com/api/checkout?product=streakwise-pro, which redirects to a Polar checkout; checkout creates a customer record with Polar (email).
 - A key can be active on **5 devices**. A new device does not activate by itself: paste the key in Settings → Streakwise → Pro license and press **Activate**. Need a 6th device? Deactivate an old one in the Polar customer portal (https://polar.sh/formchime/portal), then press **Activate** on the new device. A device released in the portal locks Pro at its next online check and is **not** re-activated automatically; press **Activate** there if you want it back. Pressing **Remove** in Streakwise also releases that device's slot (if the release can't reach Polar, the key is still removed locally and you can release the slot in the portal).
 - **Refunds:** Full refund within 14 days, just email support@formchime.com (or reply to your Polar receipt email). After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
-- Streakwise Pro is not sold to customers in Japan. Checkout is blocked based on your location (IP country) and billing country. The free features work everywhere.
+- Not available in Japan. If you were charged from Japan by mistake, email support@formchime.com for a full refund. The free features work everywhere.
 
 ## Network use disclosure
 
