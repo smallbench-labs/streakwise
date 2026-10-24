@@ -131,7 +131,7 @@ test('activations mode: 403 limit reached is invalid', async () => {
 	const { mgr } = setup([{ status: 403, json: { error: 'NotPermitted' } }], { useActivations: true });
 	await mgr.activate('KEY', 'x');
 	assert.equal(mgr.state.status, 'invalid');
-	assert.match(mgr.state.message, /activations for this key are in use/);
+	assert.match(mgr.state.message, /already active on 5 devices/);
 	assert.match(mgr.state.message, /portal/);
 });
 
@@ -149,12 +149,64 @@ test('changing key drops old cached validity', async () => {
 	assert.equal(mgr.isPro(), false);
 });
 
-test('clear removes everything without network', async () => {
+test('clear without an activation id removes everything without network', async () => {
 	const { mgr, calls } = setup([granted()]);
 	await mgr.activate('KEY', 'x');
 	await mgr.clear();
 	assert.equal(calls.length, 1);
 	assert.deepEqual(mgr.state, EMPTY_LICENSE);
+});
+
+test('S-37: Remove releases the device slot via /deactivate', async () => {
+	const { mgr, calls } = setup([act('a1'), granted(), { status: 204, json: null }], { useActivations: true });
+	await mgr.activate('KEY', 'x');
+	await mgr.clear();
+	const last = calls[calls.length - 1];
+	assert.ok(last.url.endsWith('/v1/customer-portal/license-keys/deactivate'));
+	assert.deepEqual(last.body, { key: 'KEY', organization_id: ORG, activation_id: 'a1' });
+	assert.equal(mgr.state.key, '');
+	assert.equal(mgr.state.activationId, null);
+	assert.match(mgr.state.message, /slot was released/);
+	assert.equal(mgr.isPro(), false);
+});
+
+test('S-37: Remove still completes locally when /deactivate fails (offline or 5xx)', async () => {
+	for (const fail of ['throw', { status: 500, json: null }] as const) {
+		const { mgr, calls } = setup([act('a1'), granted(), fail], { useActivations: true });
+		await mgr.activate('KEY', 'x');
+		await mgr.clear();
+		assert.equal(calls.length, 3);
+		assert.equal(mgr.state.key, '');
+		assert.equal(mgr.state.status, 'none');
+		assert.match(mgr.state.message, /could not be released/);
+	}
+});
+
+test('S-38: stored key that is not Pro is re-validated on every load', async () => {
+	const { mgr, calls, advance } = setup([granted(), 'throw', granted()]);
+	await mgr.activate('KEY', 'x');
+	advance(8 * DAY); // grace expired
+	await mgr.onLoad(); // offline: still not Pro
+	assert.equal(mgr.isPro(), false);
+	advance(60_000); // next load a minute later, now online: no 24h wait
+	await mgr.onLoad();
+	assert.equal(mgr.isPro(), true);
+	assert.equal(calls.length, 3);
+});
+
+test('S-38: Pro within the recheck interval makes no request on load', async () => {
+	const { mgr, calls, advance } = setup([granted()]);
+	await mgr.activate('KEY', 'x');
+	advance(60_000);
+	await mgr.onLoad();
+	assert.equal(calls.length, 1);
+});
+
+test('S-39: activation label set by the plugin is sent to Polar', async () => {
+	const { mgr, calls } = setup([act('a1'), granted()], { useActivations: true });
+	mgr.setDeviceLabel('Obsidian – macOS – My vault');
+	await mgr.activate('KEY', '');
+	assert.equal(calls[0].body.label, 'Obsidian – macOS – My vault');
 });
 
 // ---- Re-activation (Polar benefit: 5 activations per key, never expires) ----
@@ -165,44 +217,38 @@ test('default config uses activations', () => {
 	assert.equal(DEFAULT_LICENSE_CONFIG.useActivations, true);
 });
 
-test('stale activation id: drop it, activate again, validate with new id', async () => {
-	const { mgr, calls, advance } = setup([act('old'), granted(), notFound, act('new'), granted()], { useActivations: true });
-	await mgr.activate('KEY', 'laptop');
-	assert.equal(mgr.state.activationId, 'old');
-	advance(DAY);
-	await mgr.refreshIfDue(); // user freed this device in Polar -> validate 404
-	assert.equal(mgr.isPro(), true);
-	assert.equal(mgr.state.activationId, 'new');
-	assert.deepEqual(calls.map((c) => c.url.split('/').pop()), ['activate', 'validate', 'validate', 'activate', 'validate']);
-	assert.equal(calls[4].body.activation_id, 'new');
-});
-
-test('stale activation and all slots used: 403 with portal hint, Pro locked', async () => {
-	const { mgr, advance } = setup([act('old'), granted(), notFound, { status: 403, json: { error: 'NotPermitted' } }], { useActivations: true });
+test('S-42: stale activation id (released in portal) locks Pro and does NOT re-activate automatically', async () => {
+	const { mgr, calls, advance } = setup([act('old'), granted(), notFound], { useActivations: true });
 	await mgr.activate('KEY', 'laptop');
 	advance(DAY);
 	await mgr.refreshIfDue();
 	assert.equal(mgr.isPro(), false);
+	assert.equal(mgr.state.status, 'invalid');
 	assert.equal(mgr.state.activationId, null);
-	assert.match(mgr.state.message, /Polar customer portal/);
+	assert.match(mgr.state.message, /Press Activate/);
+	assert.deepEqual(calls.map((c) => c.url.split('/').pop()), ['activate', 'validate', 'validate']);
 });
 
-test('refunded/revoked key: re-activation 404 -> invalid, no loop', async () => {
+test('S-42: after release, pressing Activate reserves a new slot', async () => {
+	const { mgr, calls, advance } = setup([act('old'), granted(), notFound, act('new'), granted()], { useActivations: true });
+	await mgr.activate('KEY', 'laptop');
+	advance(DAY);
+	await mgr.refreshIfDue();
+	await mgr.activate('KEY', 'laptop');
+	assert.equal(mgr.isPro(), true);
+	assert.equal(mgr.state.activationId, 'new');
+	assert.equal(calls[4].body.activation_id, 'new');
+});
+
+test('S-42: later loads do not re-activate a released device either', async () => {
 	const { mgr, calls, advance } = setup([act('old'), granted(), notFound, notFound], { useActivations: true });
 	await mgr.activate('KEY', 'laptop');
 	advance(DAY);
 	await mgr.refreshIfDue();
-	assert.equal(mgr.state.status, 'invalid');
-	assert.equal(calls.length, 4);
-});
-
-test('re-activated id still rejected: validate retried only once', async () => {
-	const { mgr, calls, advance } = setup([act('old'), granted(), notFound, act('new'), notFound], { useActivations: true });
-	await mgr.activate('KEY', 'laptop');
 	advance(DAY);
-	await mgr.refreshIfDue();
-	assert.equal(mgr.state.status, 'invalid');
-	assert.equal(calls.length, 5);
+	await mgr.onLoad();
+	assert.equal(mgr.isPro(), false);
+	assert.ok(!calls.slice(2).some((c) => c.url.endsWith('/activate')));
 });
 
 test('after limit error, pressing Activate again reserves a fresh slot', async () => {
@@ -212,14 +258,6 @@ test('after limit error, pressing Activate again reserves a fresh slot', async (
 	await mgr.activate('KEY', 'x');
 	assert.equal(mgr.isPro(), true);
 	assert.equal(mgr.state.activationId, 'a2');
-});
-
-test('offline during re-activation keeps grace period', async () => {
-	const { mgr, advance } = setup([act('old'), granted(), notFound, 'throw'], { useActivations: true });
-	await mgr.activate('KEY', 'x');
-	advance(DAY);
-	await mgr.refreshIfDue();
-	assert.equal(mgr.isPro(), true);
 });
 
 // --- Free-only v0.1.0: placeholder org id => zero network, Pro never unlocks ---
@@ -478,4 +516,21 @@ test('S-33: QA scenario - rewinding to just after the last check each session no
 	}
 	assert.ok(pro < 60, `Pro in ${pro}/60 sessions`);
 	assert.equal(mgr.isPro(), false); // 60 x 4h = 10 days of use > 7-day grace
+});
+
+test('SEC-1: tampered data.json without a key never unlocks Pro and makes no request', async () => {
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: '', status: 'valid', lastValidatedAt: T0, lastCheckedAt: T0, lastSeenAt: T0 };
+	const { mgr, calls } = setup([], {}, cache);
+	assert.equal(mgr.isPro(), false);
+	await mgr.refreshIfDue();
+	assert.equal(calls.length, 0);
+});
+
+test('SEC-1: future timestamps (data.json tamper) with a fake key are re-checked and rejected online', async () => {
+	const FAR = Date.parse('2999-01-01T00:00:00Z');
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'FAKE', status: 'valid', lastValidatedAt: FAR, lastCheckedAt: FAR, lastSeenAt: FAR };
+	const { mgr, calls } = setup([{ status: 404, json: { error: 'ResourceNotFound' } }], {}, cache);
+	await mgr.refreshIfDue(); // future lastCheckedAt counts as a rewound clock -> forced revalidation
+	assert.equal(calls.length, 1);
+	assert.equal(mgr.isPro(), false);
 });

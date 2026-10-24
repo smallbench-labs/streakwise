@@ -147,7 +147,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			{
 				name: 'Default habit',
 				desc: 'Frontmatter property used when a block has no "habits:" line.',
-				render: (st) => { st.addText((t) => t.setPlaceholder('exercise').setValue(s.defaultHabit)
+				render: (st) => { st.addText((t) => t.setPlaceholder('Exercise').setValue(s.defaultHabit)
 					.onChange((v) => { void this.applyChange((x) => { x.defaultHabit = v.trim(); }); })); },
 			},
 			{
@@ -194,7 +194,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						name: 'Daily notes location',
 						desc: `Using ${detected.origin}: folder "${detected.folder || '/'}", format ${detected.format}.`,
 						render: (st) => { st.addDropdown((d) => d
-							.addOption('auto', 'Follow Daily notes / Periodic Notes')
+							.addOption('auto', 'Follow the daily notes or periodic notes plugin')
 							.addOption('custom', 'Custom')
 							.setValue(s.sourceMode)
 							.onChange((v) => { void this.applyChange((x) => { x.sourceMode = v as 'auto' | 'custom'; }, true); })); },
@@ -225,7 +225,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			this.keyDraft = lic.state.key;
 			const status = lic.isPro()
 				? `Pro unlocked (offline grace: ${lic.graceDaysLeft()} day(s) left).`
-				: lic.state.status === 'invalid' ? 'Pro locked.' : 'Free version: yearly heatmap of one habit.';
+				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
 			const gate = this.buyGate ?? (this.buyGate = new BuyGate(this.regionGet ?? obsidianHttpGetJson));
@@ -239,10 +239,13 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				// S-34: hidden until the region is known; shown if the request fails; hidden if blocked.
 				rows.push({
 					name: 'Get Streakwise Pro',
-					desc: 'One-time purchase, US$19, through Polar. Not sold in Japan.',
+					desc: 'Month, week, quarter and year-to-date views, several habits per block, and PNG export. '
+						+ 'One-time purchase, includes all future updates: US$19 (plus VAT/sales tax where applicable, shown at checkout), '
+						+ 'use it on up to 5 devices, full refund within 14 days. '
+						+ 'Pro checks the key online about once a day and works offline for up to 7 days. Checkout by Polar. Not available in Japan.',
 					visible: () => this.buyVisible(),
 					render: (st) => {
-						st.addButton((b) => b.setButtonText('Buy Pro').onClick(() => { window.open(CHECKOUT_URL); }));
+						st.addButton((b) => b.setButtonText('Buy Pro – US$19').onClick(() => { window.open(CHECKOUT_URL); }));
 						this.legacyBuyEl = st.settingEl;
 					},
 				});
@@ -252,8 +255,10 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				desc: 'Pro adds month, week, quarter and year-to-date views, multiple habits and PNG export. '
 					+ (this.plugin.keyStore.kind === 'keychain'
 						? 'The key is stored in Obsidian Keychain, not in your vault files. '
-						: 'The key is stored in this plugin\'s data.json in your vault. ')
-					+ 'It is sent only to Polar (api.polar.sh) to verify it, and only when you press Activate or once a day afterwards.',
+						: '⚠ Your Obsidian version has no Keychain, so the key is stored in plain text in this plugin\'s data.json in your vault. '
+							+ 'If your vault is synced or kept in git, the key goes with it. Update Obsidian to 1.11.4 or later to keep it in Keychain. ')
+					+ 'It is sent only to Polar (api.polar.sh) to verify it, and only when you press Activate or once a day afterwards. '
+					+ 'On a new device, paste the key and press Activate; it does not activate by itself. Up to 5 devices; to free one, deactivate it in the Polar customer portal.',
 				render: (st) => {
 					st.addText((t) => {
 						t.inputEl.type = 'password';
@@ -262,7 +267,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 					})
 						.addButton((b) => b.setButtonText('Activate').setCta().onClick(async () => {
 							b.setDisabled(true);
-							await lic.activate(this.keyDraft, 'Obsidian');
+							await lic.activate(this.keyDraft, '');
 							this.refresh();
 						}))
 						.addButton((b) => b.setButtonText('Remove').onClick(async () => {

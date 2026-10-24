@@ -63,3 +63,4 @@ export const requestUrl = async () => ({ status: 200, json: null });
 export class App {}
 export class TFile {}
 export class TFolder {}
+export const Platform = { isMacOS: false, isWin: false, isLinux: true, isIosApp: false, isAndroidApp: false };

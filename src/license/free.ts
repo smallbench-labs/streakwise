@@ -13,6 +13,7 @@ export const FREE_LICENSE = {
 	touch: async () => {},
 	activate: async () => EMPTY_LICENSE,
 	clear: async () => {},
+	setDeviceLabel: () => {},
 } as unknown as LicenseManager;
 
 export const FREE_KEY_STORE: KeyStore = {

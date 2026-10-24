@@ -1,7 +1,8 @@
-import { Editor, Plugin, TAbstractFile, debounce } from 'obsidian';
+import { Editor, Platform, Plugin, TAbstractFile, debounce } from 'obsidian';
 import { DEFAULT_SETTINGS, StreakwiseSettingTab, StreakwiseSettings } from './settings';
 import { LicenseManager, DEFAULT_LICENSE_CONFIG } from './license/licenseManager';
 import { obsidianHttpPost } from './license/obsidianHttp';
+import { buildDeviceLabel } from './license/deviceLabel';
 import { KeyStore, selectKeyStore } from './license/keyStore';
 import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
@@ -46,6 +47,8 @@ export default class StreakwisePlugin extends Plugin {
 				this.refreshBlocks();
 			},
 		);
+
+		if (!FREE_BUILD) this.license.setDeviceLabel(buildDeviceLabel(Platform, this.app.vault.getName()));
 
 		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (source, el, ctx) => {
 			ctx.addChild(new HeatmapBlock(el, source, this));

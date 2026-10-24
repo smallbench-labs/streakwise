@@ -16,10 +16,14 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 - Works in narrow panes: the grid scrolls to today, and the title and streak line wrap.
 - The free features work fully offline (see Network use disclosure for Pro).
 
-**Streakwise Pro (one-time purchase, US$19):**
-- Month, week, quarter and year-to-date views.
-- Several habits in one block.
-- Export a heatmap as PNG into your vault (generated locally, no upload).
+**Streakwise Pro (one-time purchase, includes all future updates, US$19 plus tax where applicable):**
+- Month and week views: see this week at a glance without scrolling a whole year. Quarter and year-to-date views too.
+- Several habits in one block: exercise, reading and sleep side by side.
+- PNG export: drop your year into a review note or share it (generated locally, no upload).
+
+Pro periodically checks your license online (at most once a day) and works offline for up to 7 days. Use it on up to 5 devices; full refund within 14 days.
+
+![Streakwise Pro month view with several habits in one block](shots/30_pro_month_multi.png)
 
 ![Three free heatmap blocks in one note](shots/26_free_multiple_blocks.png)
 
@@ -58,21 +62,21 @@ The command **Insert heatmap block** adds a starter block.
 
 ## Payment disclosure
 
-- **Optional payments:** this plugin offers an optional paid upgrade (Streakwise Pro). Payment: optional. The yearly heatmap is free and fully functional.
-- Streakwise Pro is a **one-time purchase (US$19)** sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
+- **Optional payments.** The yearly heatmap is free and complete. Streakwise Pro is an optional one-time upgrade.
+- **One-time purchase, includes all future updates.** No subscription, and your key doesn't expire. Pro checks the key with Polar periodically (at most once a day when you're online) and keeps working for up to **7 days offline**.
+- Streakwise Pro costs **US$19 (plus VAT/sales tax where applicable, calculated and shown at checkout)** and is sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
 - No account is required to use the plugin. The **Buy Pro** button opens https://formchime.com/api/checkout?product=streakwise-pro, which redirects to a Polar checkout; checkout creates a customer record with Polar (email).
-- A key can be active on **5 devices**. To move it, deactivate an old device in the Polar customer portal; Streakwise re-activates automatically on its next check.
-  Customer portal: https://polar.sh/formchime/portal
-- Pro is a one-time purchase: keys do not expire.
-- **Refunds:** Full refund within 14 days of purchase, no questions asked. Request it by replying to your Polar receipt email or writing to support@formchime.com. After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
-- Streakwise Pro is currently not sold to customers in Japan. The free features work everywhere.
+- A key can be active on **5 devices**. A new device does not activate by itself: paste the key in Settings → Streakwise → Pro license and press **Activate**. Need a 6th device? Deactivate an old one in the Polar customer portal (https://polar.sh/formchime/portal), then press **Activate** on the new device. A device released in the portal locks Pro at its next online check and is **not** re-activated automatically; press **Activate** there if you want it back. Pressing **Remove** in Streakwise also releases that device's slot (if the release can't reach Polar, the key is still removed locally and you can release the slot in the portal).
+- **Refunds:** Full refund within 14 days, just email support@formchime.com (or reply to your Polar receipt email). After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
+- Streakwise Pro is not sold to customers in Japan. Checkout is blocked based on your location (IP country) and billing country. The free features work everywhere.
 
 ## Network use disclosure
 
 - **No network requests are made unless you open the Pro settings panel or enter a license key.** All heatmap, streak and PNG export features run locally.
-- When you open **Settings → Streakwise → Pro license** without an active Pro key, Streakwise sends one `GET https://formchime.com/api/region` request to check whether Pro can be sold in your region (the server sees your IP address; nothing else is sent). If the answer is "blocked", the Buy Pro button is hidden. If the request fails, the button is still shown.
-- With a key, when you press **Activate** and then at most **once a day** on startup, Streakwise contacts Polar:
-  - `POST https://api.polar.sh/v1/customer-portal/license-keys/activate` — reserves one of the key's 5 device slots (sends the key, our public Polar organization ID and the label "Obsidian").
+- When you open **Settings → Streakwise → Pro license** without an active Pro key, Streakwise sends one `GET https://formchime.com/api/region` request to check whether Pro can be sold in your region (nothing else is sent). This request sends your IP address to formchime.com, which reads only the country Cloudflare derives from it; formchime.com does not log or store your IP. When you press Buy Pro, formchime.com passes your IP to Polar to create the checkout (tax and fraud checks). formchime.com privacy policy: <!-- TODO(LINE表單通知PM): Streakwise privacy policy URL on formchime.com --> PRIVACY_URL_TBD. If the answer is "blocked", the Buy Pro button is hidden. If the request fails, the button is still shown.
+- With a key, when you press **Activate** and then at most **once a day** on startup (or on every startup while a stored key is not currently unlocking Pro, so Pro comes back as soon as you're online), Streakwise contacts Polar:
+  - `POST https://api.polar.sh/v1/customer-portal/license-keys/activate` — reserves one of the key's 5 device slots (sends the key, our public Polar organization ID and a device label such as "Obsidian – macOS – My vault": app, platform and vault name only, so you can tell devices apart in the portal).
+  - `POST https://api.polar.sh/v1/customer-portal/license-keys/deactivate` — only when you press **Remove**; releases this device's slot (sends the key, organization ID and activation ID).
   - `POST https://api.polar.sh/v1/customer-portal/license-keys/validate` — confirms the key (sends the key, organization ID and activation ID).
 - Nothing from your vault is sent: no note content, file names or habit data.
 - Offline: after a successful check, Pro stays unlocked for **7 days** without internet.
@@ -81,7 +85,7 @@ The command **Insert heatmap block** adds a starter block.
 ## Data storage
 
 - Settings and the cached license result are stored in `.obsidian/plugins/streakwise/data.json` in your vault.
-- **License key:** on Obsidian 1.11.4+ it is stored in Obsidian's **Keychain** (Settings → Keychain, ID `streakwise-license-key`), not in vault files, so it is not synced or committed with your notes. Encryption comes from the operating system's secret store; if none is available (e.g. some Linux setups), Obsidian keeps Keychain secrets unencrypted. On older Obsidian versions the key is stored in `data.json`. Keys saved by earlier builds are migrated automatically.
+- **License key:** on Obsidian 1.11.4+ it is stored in Obsidian's **Keychain** (Settings → Keychain, ID `streakwise-license-key`), not in vault files, so it is not synced or committed with your notes. Encryption comes from the operating system's secret store; if none is available (e.g. some Linux setups), Obsidian keeps Keychain secrets unencrypted (on Linux without a keyring/secret service, the key ends up in plain text in Obsidian's own profile storage). On Obsidian versions before 1.11.4 the key is stored in plain text in `data.json`, so it travels with your vault if you sync it or keep it in git; the settings tab warns about this, and we recommend updating Obsidian. Keys saved by earlier builds are migrated automatically.
 - Exported PNGs go to the folder set in settings (default `Streakwise exports/`).
 - No files outside your vault are read or written (besides Obsidian's own Keychain).
 
@@ -108,7 +112,7 @@ Bugs and questions: open an issue at https://github.com/smallbench-labs/streakwi
 
 ## Clean-room statement
 
-Written from scratch; see REVIEW_NOTES.md.
+Written from scratch.
 
 ## License
 

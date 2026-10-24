@@ -147,3 +147,20 @@ test('S-34 legacy display(): request failure still shows the button', async () =
 		setDeclarative(true);
 	}
 });
+
+test('SEC-2: without Keychain (Obsidian < 1.11.4) the license row warns about plain text in data.json', () => {
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	(tab as unknown as { plugin: { keyStore: { kind: string } } }).plugin.keyStore.kind = 'data.json';
+	const sec = (tab as unknown as { licenseSection(): { rows: { name: string; desc?: string }[] } }).licenseSection();
+	const row = sec.rows.find((r) => r.name === 'License key');
+	assert.ok(row?.desc?.includes('plain text'));
+	assert.ok(row?.desc?.includes('1.11.4'));
+});
+
+test('SEC-2: with Keychain no plain-text warning is shown', () => {
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	const sec = (tab as unknown as { licenseSection(): { rows: { name: string; desc?: string }[] } }).licenseSection();
+	const row = sec.rows.find((r) => r.name === 'License key');
+	assert.ok(row?.desc?.includes('Keychain'));
+	assert.ok(!row?.desc?.includes('plain text'));
+});

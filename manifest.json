@@ -3,7 +3,7 @@
 	"name": "Streakwise",
 	"version": "0.2.0",
 	"minAppVersion": "1.5.0",
-	"description": "A habit heatmap and streak tracker for your daily notes.",
+	"description": "Turn habit properties in your daily notes into a yearly heatmap with streaks. Optional Pro upgrade.",
 	"author": "Smallbench Labs",
 	"authorUrl": "https://github.com/smallbench-labs",
 	"isDesktopOnly": false

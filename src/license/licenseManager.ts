@@ -59,7 +59,9 @@ export class LicenseManager {
 
 	/** On plugin load: a clock behind lastSeen forces revalidation (S-30/S-33); then record time as usual. */
 	async onLoad(): Promise<LicenseCache> {
-		const result = await this.refreshIfDue();
+		// S-38: a stored key that is not Pro right now (e.g. grace ran out offline) is re-checked on every load,
+		// so a paying user gets Pro back as soon as they are online again.
+		const result = this.cache.key && this.isConfigured() && !this.isPro() ? await this.validate() : await this.refreshIfDue();
 		await this.touch();
 		return result;
 	}
@@ -73,7 +75,9 @@ export class LicenseManager {
 		// Free-only build (no Polar org ID): Pro never unlocks, even from an old cached result.
 		if (!this.isConfigured()) return false;
 		const c = this.cache;
-		if (c.status !== 'valid' || c.lastValidatedAt === null) return false;
+		// SEC-1: no key means refreshIfDue()/touch() never run, so a hand-edited data.json
+		// (status 'valid' + future lastValidatedAt/lastSeenAt) would unlock Pro forever offline.
+		if (!c.key || c.status !== 'valid' || c.lastValidatedAt === null) return false;
 		const t = this.effectiveNow();
 		if (c.expiresAt !== null && t >= c.expiresAt) return false;
 		return t - c.lastValidatedAt <= this.config.gracePeriodMs;
@@ -112,7 +116,7 @@ export class LicenseManager {
 		const keyChanged = key !== this.cache.key;
 		this.cache = keyChanged ? { ...EMPTY_LICENSE, key } : { ...this.cache, key };
 
-		this.deviceLabel = deviceLabel;
+		this.setDeviceLabel(deviceLabel);
 		if (this.config.useActivations && !this.cache.activationId) {
 			const failed = await this.reserveActivation();
 			if (failed) return failed;
@@ -121,6 +125,11 @@ export class LicenseManager {
 	}
 
 	private deviceLabel = 'Obsidian';
+
+	/** S-39: label used when a slot is reserved (e.g. "Obsidian – macOS – My vault"). */
+	setDeviceLabel(label: string): void {
+		if (label.trim()) this.deviceLabel = label.trim();
+	}
 
 	/** Asks Polar for a device slot. Returns a final state on failure, or null on success. */
 	private async reserveActivation(): Promise<LicenseCache | null> {
@@ -149,12 +158,28 @@ export class LicenseManager {
 		return this.validate();
 	}
 
-	/** Remove the key and everything cached. Purely local. */
+	/**
+	 * Remove the key and everything cached. S-37: if this device holds a Polar activation,
+	 * release it first (best effort). Removal always completes locally, even if the call fails.
+	 */
 	async clear(): Promise<LicenseCache> {
-		return this.update({ ...EMPTY_LICENSE });
+		const { key, activationId } = this.cache;
+		let message = '';
+		if (key && activationId && this.isConfigured()) {
+			const res = await this.post('/v1/customer-portal/license-keys/deactivate', {
+				key,
+				organization_id: this.config.organizationId,
+				activation_id: activationId,
+			});
+			const released = res !== 'offline' && (res.status === 204 || res.status === 200 || res.status === 404);
+			message = released
+				? 'Key removed. This device\'s slot was released.'
+				: `Key removed, but this device's slot could not be released. Deactivate it in your Polar customer portal (${this.config.portalUrl}).`;
+		}
+		return this.update({ ...EMPTY_LICENSE, message });
 	}
 
-	private async validate(allowReactivate = true): Promise<LicenseCache> {
+	private async validate(): Promise<LicenseCache> {
 		const body: Record<string, unknown> = {
 			key: this.cache.key,
 			organization_id: this.config.organizationId,
@@ -164,13 +189,17 @@ export class LicenseManager {
 		const res = await this.post('/v1/customer-portal/license-keys/validate', body);
 		if (res === 'offline') return this.markOffline();
 
-		// Stale activation (e.g. the user freed this device in the Polar portal):
-		// drop the old activation id and reserve a fresh slot once.
-		if (res.status === 404 && this.cache.activationId && this.config.useActivations && allowReactivate) {
-			this.cache.activationId = null;
-			const failed = await this.reserveActivation();
-			if (failed) return failed;
-			return this.validate(false);
+		// S-42: stale activation (the user released this device in the Polar portal). Do NOT take a new
+		// slot automatically; lock Pro and wait for the user to press Activate on this device.
+		if (res.status === 404 && this.cache.activationId && this.config.useActivations) {
+			return this.update({
+				...this.cache,
+				status: 'invalid',
+				activationId: null,
+				lastValidatedAt: null,
+				lastCheckedAt: this.now(),
+				message: 'This device was released in the Polar customer portal. Press Activate to use Pro here again.',
+			});
 		}
 		// Only Polar's 404 / 422 are a verdict on the key. 401/403 (proxy, WAF), 5xx, 429 etc.
 		// are transient: keep the cached result under grace (S-31).
@@ -233,7 +262,7 @@ export class LicenseManager {
 		// 5xx / 429 are server trouble, not a verdict on the key: treat like offline.
 		if (httpStatus >= 500 || httpStatus === 429) return this.markOffline();
 		const why = httpStatus === 403
-			? `All activations for this key are in use, or the key was revoked. Free a device in your Polar customer portal (${this.config.portalUrl}) and press Activate again.`
+			? `This key is already active on 5 devices, or it was refunded. To free a slot, deactivate a device in your Polar customer portal (${this.config.portalUrl}), then press Activate again on this device.`
 			: 'License key not recognised, revoked or expired.';
 		return this.update({
 			...this.cache,

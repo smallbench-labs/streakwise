@@ -34,4 +34,14 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		// Product/vendor names keep their casing; Moment.js format tokens are not prose.
+		rules: {
+			'obsidianmd/ui/sentence-case': ['warn', {
+				brands: ['Streakwise', 'Streakwise Pro', 'Pro', 'Polar', 'Obsidian', 'Keychain'],
+				// Buy button shows the price (currency code US$), wording set by Obsidian PM.
+				ignoreRegex: ['^[YMDHhms/ .-]+$', '^Buy Pro – US\\$\\d+$'],
+			}],
+		},
+	},
 );
