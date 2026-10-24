@@ -243,7 +243,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						+ 'One-time purchase, includes all future updates: US$19 (plus VAT/sales tax where applicable, shown at checkout), '
 						+ 'use it on up to 5 devices, full refund within 14 days. '
 						+ 'Pro checks the key online about once a day and works offline for up to 7 days. Checkout by Polar. '
-						+ 'Not available in Japan. If you were charged from Japan by mistake, email support@formchime.com for a full refund.',
+						+ 'Not available in Japan. If you\'re charged from Japan, we refund in full and revoke the key; you can also email contact@formchime.com.',
 					visible: () => this.buyVisible(),
 					render: (st) => {
 						st.addButton((b) => b.setButtonText('Buy Pro – US$19').onClick(() => { window.open(CHECKOUT_URL); }));
