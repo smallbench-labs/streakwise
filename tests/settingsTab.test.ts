@@ -13,6 +13,7 @@ function makeTab(get: HttpGetJson, isPro = false) {
 		settings: { sourceMode: 'custom', customFolder: 'Daily', customFormat: 'YYYY-MM-DD', defaultHabit: '', weekStart: 1, palette: 'accent', exportFolder: 'x', license: { ...EMPTY_LICENSE } },
 		license: { isConfigured: () => true, isPro: () => isPro, graceDaysLeft: () => 0, state: { ...EMPTY_LICENSE } },
 		keyStore: { kind: 'keychain' },
+		deviceCode: 'a1b2',
 		saveSettings: async () => {},
 		refreshAfterSettings: () => {},
 	};
@@ -163,4 +164,11 @@ test('SEC-2: with Keychain no plain-text warning is shown', () => {
 	const row = sec.rows.find((r) => r.name === 'License key');
 	assert.ok(row?.desc?.includes('Keychain'));
 	assert.ok(!row?.desc?.includes('plain text'));
+});
+
+test('S-39: settings tab shows this device code', () => {
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	const sec = (tab as unknown as { licenseSection(): { rows: { name: string; desc?: string }[] } }).licenseSection();
+	const row = sec.rows.find((r) => r.name === 'This device');
+	assert.ok(row?.desc?.includes('a1b2'));
 });

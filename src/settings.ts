@@ -251,6 +251,12 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 					},
 				});
 			}
+			if (this.plugin.deviceCode) {
+				rows.push({
+					name: 'This device',
+					desc: `Device code ${this.plugin.deviceCode}. In the Polar customer portal this device is listed as "Obsidian – … – ${this.plugin.deviceCode}".`,
+				});
+			}
 			rows.push({
 				name: 'License key',
 				desc: 'Pro adds month, week, quarter and year-to-date views, multiple habits and PNG export. '

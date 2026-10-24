@@ -2,7 +2,7 @@ import { Editor, Platform, Plugin, TAbstractFile, debounce } from 'obsidian';
 import { DEFAULT_SETTINGS, StreakwiseSettingTab, StreakwiseSettings } from './settings';
 import { LicenseManager, DEFAULT_LICENSE_CONFIG } from './license/licenseManager';
 import { obsidianHttpPost } from './license/obsidianHttp';
-import { buildDeviceLabel } from './license/deviceLabel';
+import { buildDeviceLabel, getDeviceCode, LocalStore } from './license/deviceLabel';
 import { KeyStore, selectKeyStore } from './license/keyStore';
 import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
@@ -14,6 +14,23 @@ export const BLOCK_LANGUAGE = 'streakwise';
 export default class StreakwisePlugin extends Plugin {
 	settings!: StreakwiseSettings;
 	license!: LicenseManager;
+	/** S-39: random per-device code shown in settings and in the Polar activation label. */
+	deviceCode = '';
+
+	/**
+	 * Device-local storage for the device code. Not data.json: it can sync to other devices with the vault.
+	 * Obsidian 1.8.7+: app.loadLocalStorage (per vault, per device); older: window.localStorage (per device).
+	 */
+	private localStore(): LocalStore {
+		const app = this.app as unknown as { loadLocalStorage?: (k: string) => unknown; saveLocalStorage?: (k: string, v: string) => void };
+		if (typeof app.loadLocalStorage === 'function' && typeof app.saveLocalStorage === 'function') {
+			return { load: (k) => app.loadLocalStorage?.(k), save: (k, v) => app.saveLocalStorage?.(k, v) };
+		}
+		return {
+			load: (k) => { try { return window.localStorage.getItem(k); } catch { return null; } },
+			save: (k, v) => { try { window.localStorage.setItem(k, v); } catch { /* storage unavailable: code is regenerated next load */ } },
+		};
+	}
 	keyStore!: KeyStore;
 	/** Rendered blocks, so they can refresh after Pro is unlocked or settings change. */
 	readonly blocks = new Set<HeatmapBlock>();
@@ -48,7 +65,10 @@ export default class StreakwisePlugin extends Plugin {
 			},
 		);
 
-		if (!FREE_BUILD) this.license.setDeviceLabel(buildDeviceLabel(Platform, this.app.vault.getName()));
+		if (!FREE_BUILD) {
+			this.deviceCode = getDeviceCode(this.localStore());
+			this.license.setDeviceLabel(buildDeviceLabel(Platform, this.deviceCode));
+		}
 
 		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (source, el, ctx) => {
 			ctx.addChild(new HeatmapBlock(el, source, this));

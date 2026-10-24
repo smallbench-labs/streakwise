@@ -204,9 +204,9 @@ test('S-38: Pro within the recheck interval makes no request on load', async () 
 
 test('S-39: activation label set by the plugin is sent to Polar', async () => {
 	const { mgr, calls } = setup([act('a1'), granted()], { useActivations: true });
-	mgr.setDeviceLabel('Obsidian – macOS – My vault');
+	mgr.setDeviceLabel('Obsidian – macOS – a1b2');
 	await mgr.activate('KEY', '');
-	assert.equal(calls[0].body.label, 'Obsidian – macOS – My vault');
+	assert.equal(calls[0].body.label, 'Obsidian – macOS – a1b2');
 });
 
 // ---- Re-activation (Polar benefit: 5 activations per key, never expires) ----

@@ -126,7 +126,7 @@ export class LicenseManager {
 
 	private deviceLabel = 'Obsidian';
 
-	/** S-39: label used when a slot is reserved (e.g. "Obsidian – macOS – My vault"). */
+	/** S-39: label used when a slot is reserved (e.g. "Obsidian – macOS – a1b2"). */
 	setDeviceLabel(label: string): void {
 		if (label.trim()) this.deviceLabel = label.trim();
 	}
