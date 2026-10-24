@@ -224,7 +224,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		if (!FREE_BUILD && lic.isConfigured()) {
 			this.keyDraft = lic.state.key;
 			const status = lic.isPro()
-				? `Pro unlocked (offline grace: ${lic.graceDaysLeft()} day(s) left).`
+				? `Pro is active. Works offline for ${lic.graceDaysLeft()} more day(s).`
 				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
@@ -239,11 +239,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				// S-34: hidden until the region is known; shown if the request fails; hidden if blocked.
 				rows.push({
 					name: 'Get Streakwise Pro',
-					desc: 'Month, week, quarter and year-to-date views, several habits per block, and PNG export. '
-						+ 'One-time purchase, includes all future updates: US$19 (plus VAT/sales tax where applicable, shown at checkout), '
-						+ 'use it on up to 5 devices, full refund within 14 days. '
-						+ 'Pro checks the key online about once a day and works offline for up to 7 days. Checkout by Polar. '
-						+ 'Not available in Japan. If you\'re charged from Japan, we refund in full and revoke the key; you can also email contact@formchime.com.',
+					desc: 'Month, week, quarter and YTD views, several habits per block, PNG export. '
+						+ 'US$19 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
 					visible: () => this.buyVisible(),
 					render: (st) => {
 						st.addButton((b) => b.setButtonText('Buy Pro – US$19').onClick(() => { window.open(CHECKOUT_URL); }));
@@ -254,7 +251,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			if (this.plugin.deviceCode) {
 				rows.push({
 					name: 'This device',
-					desc: `Device code ${this.plugin.deviceCode}. In the Polar customer portal this device is listed as "Obsidian – … – ${this.plugin.deviceCode}".`,
+					desc: `Device code ${this.plugin.deviceCode}. In the Polar customer portal this device is listed as "${this.plugin.deviceLabel}".`,
 				});
 			}
 			rows.push({

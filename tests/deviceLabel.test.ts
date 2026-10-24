@@ -36,3 +36,11 @@ test('S-39: invalid stored value is replaced', () => {
 	assert.equal(c, '0000');
 	assert.equal(s.data[DEVICE_CODE_KEY], '0000');
 });
+
+test('R2-2: default device code uses crypto randomness and stays in [0-9a-z]{4}', async () => {
+	const { cryptoRandom } = await import('../src/license/deviceLabel');
+	for (let i = 0; i < 200; i++) { const r = cryptoRandom(); assert.ok(r >= 0 && r < 1); }
+	const codes = new Set(Array.from({ length: 200 }, () => randomDeviceCode()));
+	for (const c of codes) assert.match(c, /^[0-9a-z]{4}$/);
+	assert.ok(codes.size > 190);
+});

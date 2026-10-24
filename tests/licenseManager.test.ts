@@ -534,3 +534,16 @@ test('SEC-1: future timestamps (data.json tamper) with a fake key are re-checked
 	assert.equal(calls.length, 1);
 	assert.equal(mgr.isPro(), false);
 });
+
+test('R2-1: Remove completes locally even if /deactivate never answers', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	const delay = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); });
+	const cache: LicenseCache = { ...EMPTY_LICENSE, key: 'K', activationId: 'a1', status: 'valid', lastValidatedAt: T0, lastCheckedAt: T0, lastSeenAt: T0 };
+	const mgr = new LicenseManager(cache, { ...DEFAULT_LICENSE_CONFIG, organizationId: ORG, useActivations: true }, () => new Promise(() => {}), () => T0, async () => {}, () => 0, delay);
+	const p = mgr.clear();
+	t.mock.timers.tick(10_000);
+	await p;
+	assert.equal(mgr.state.key, '');
+	assert.equal(mgr.isPro(), false);
+	assert.match(mgr.state.message, /could not be released/);
+});

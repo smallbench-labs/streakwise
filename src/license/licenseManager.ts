@@ -13,6 +13,9 @@ export const DEFAULT_LICENSE_CONFIG: LicenseConfig = {
 	recheckIntervalMs: 86_400_000, // 1 day
 };
 
+/** Max wait for /deactivate before Remove completes locally anyway (R2-1). */
+export const DEACTIVATE_TIMEOUT_MS = 10_000;
+
 /** Clock skew tolerated before we treat 'now' as rewound (S-30). */
 export const CLOCK_SKEW_TOLERANCE_MS = 300_000; // 5 minutes
 
@@ -37,6 +40,8 @@ export class LicenseManager {
 		private readonly save: (cache: LicenseCache) => Promise<void>,
 		/** Monotonic clock (performance.now); unaffected by wall-clock changes. */
 		private readonly mono: Clock = () => performance.now(),
+		/** Timer used to bound /deactivate (R2-1). The plugin passes window.setTimeout; default never fires. */
+		private readonly delay: (ms: number) => Promise<void> = () => new Promise<void>(() => {}),
 	) {}
 
 	private lastMono: number | null = null;
@@ -166,11 +171,15 @@ export class LicenseManager {
 		const { key, activationId } = this.cache;
 		let message = '';
 		if (key && activationId && this.isConfigured()) {
-			const res = await this.post('/v1/customer-portal/license-keys/deactivate', {
-				key,
-				organization_id: this.config.organizationId,
-				activation_id: activationId,
-			});
+			// R2-1: requestUrl has no timeout; never let a hung request block local removal.
+			const res = await Promise.race([
+				this.post('/v1/customer-portal/license-keys/deactivate', {
+					key,
+					organization_id: this.config.organizationId,
+					activation_id: activationId,
+				}),
+				this.delay(DEACTIVATE_TIMEOUT_MS).then(() => 'offline' as const),
+			]);
 			const released = res !== 'offline' && (res.status === 204 || res.status === 200 || res.status === 404);
 			message = released
 				? 'Key removed. This device\'s slot was released.'
@@ -253,7 +262,7 @@ export class LicenseManager {
 			...this.cache,
 			lastCheckedAt: this.effectiveNow(),
 			message: pro
-				? `Could not reach the license server. Pro stays unlocked offline for ${this.graceDaysLeft()} more day(s).`
+				? `Could not reach the license server. Works offline for ${this.graceDaysLeft()} more day(s).`
 				: 'Could not reach the license server. Check your connection and try again.',
 		});
 	}

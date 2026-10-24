@@ -29,8 +29,15 @@ export function platformName(p: PlatformFlags): string {
 	return 'Unknown platform';
 }
 
+/** Uniform random in [0,1) from the Web Crypto API (rejection-free: 32-bit / 2^32). Falls back to Math.random. */
+export function cryptoRandom(): number {
+	const c = typeof crypto !== 'undefined' ? crypto : undefined; // Web Crypto: Electron, iOS/Android WebView, Node 19+
+	if (c && typeof c.getRandomValues === 'function') return (c.getRandomValues(new Uint32Array(1))[0] ?? 0) / 4294967296;
+	return Math.random();
+}
+
 /** Random 4-char lowercase code [0-9a-z]. */
-export function randomDeviceCode(rand: () => number = Math.random): string {
+export function randomDeviceCode(rand: () => number = cryptoRandom): string {
 	const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
 	let out = '';
 	for (let i = 0; i < 4; i++) out += chars[Math.floor(rand() * chars.length) % chars.length];
@@ -48,4 +55,20 @@ export function getDeviceCode(store: LocalStore, rand?: () => number): string {
 
 export function buildDeviceLabel(p: PlatformFlags, code: string): string {
 	return ['Obsidian', platformName(p), code].join(' – ');
+}
+
+/**
+ * Device-local storage for the device code. Not data.json: it can sync to other devices with the vault.
+ * Obsidian 1.8.7+: app.loadLocalStorage (per vault, per device); older: window.localStorage (per device).
+ * Module-level (not a plugin method) so FREE_BUILD bundles tree-shake it away.
+ */
+export function appLocalStore(app: unknown): LocalStore {
+	const a = app as { loadLocalStorage?: (k: string) => unknown; saveLocalStorage?: (k: string, v: string) => void };
+	if (typeof a.loadLocalStorage === 'function' && typeof a.saveLocalStorage === 'function') {
+		return { load: (k) => a.loadLocalStorage?.(k), save: (k, v) => a.saveLocalStorage?.(k, v) };
+	}
+	return {
+		load: (k) => { try { return window.localStorage.getItem(k); } catch { return null; } },
+		save: (k, v) => { try { window.localStorage.setItem(k, v); } catch { /* storage unavailable: code is regenerated next load */ } },
+	};
 }

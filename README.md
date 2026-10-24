@@ -23,7 +23,7 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 
 Pro periodically checks your license online (at most once a day) and works offline for up to 7 days. Use it on up to 5 devices; full refund within 14 days.
 
-![Streakwise Pro month view with several habits in one block](shots/30_pro_month_multi.png)
+![Streakwise Pro month view with several habits in one block (demo data)](shots/30_pro_month_multi.png)
 
 ![Three free heatmap blocks in one note](shots/26_free_multiple_blocks.png)
 
@@ -73,7 +73,7 @@ The command **Insert heatmap block** adds a starter block.
 ## Network use disclosure
 
 - **No network requests are made unless you open the Pro settings panel or enter a license key.** All heatmap, streak and PNG export features run locally.
-- When you open **Settings → Streakwise → Pro license** without an active Pro key, Streakwise sends one `GET https://formchime.com/api/region` request to check whether Pro can be sold in your region (nothing else is sent). This request sends your IP address to formchime.com, which reads only the country Cloudflare derives from it; formchime.com does not log or store your IP. When you press Buy Pro, formchime.com passes your IP to Polar to create the checkout (tax and fraud checks). formchime.com privacy policy: https://formchime.com/streakwise/privacy. If the answer is "blocked", the Buy Pro button is hidden. If the request fails, the button is still shown.
+- When you open **Settings → Streakwise → Pro license** without an active Pro key, Streakwise sends one `GET https://formchime.com/api/region` request to check whether Pro can be sold in your region (nothing else is sent). This request sends your IP address to formchime.com, which reads only the country Cloudflare derives from it. formchime.com does not store your IP; Cloudflare's request logs may include it for up to 7 days. When you press Buy Pro, formchime.com passes your IP to Polar to create the checkout (tax and fraud checks). formchime.com privacy policy: https://formchime.com/streakwise/privacy. If the answer is "blocked", the Buy Pro button is hidden. If the request fails, the button is still shown, but checkout is blocked if your region can't be determined.
 - With a key, when you press **Activate** and then at most **once a day** on startup (or on every startup while a stored key is not currently unlocking Pro, so Pro comes back as soon as you're online), Streakwise contacts Polar:
   - `POST https://api.polar.sh/v1/customer-portal/license-keys/activate` — reserves one of the key's 5 device slots (sends the key, our public Polar organization ID and a device label such as "Obsidian – macOS – a1b2": app, platform and a random 4-character device code, shown in settings as "This device", so you can tell devices apart in the portal; no vault name, user name or host name).
   - `POST https://api.polar.sh/v1/customer-portal/license-keys/deactivate` — only when you press **Remove**; releases this device's slot (sends the key, organization ID and activation ID).
@@ -93,7 +93,7 @@ The command **Insert heatmap block** adds a starter block.
 ## Known limits
 
 - Only frontmatter properties are read (not task checkboxes in the note body).
-- The offline grace period uses your device clock; setting the clock back can extend it.
+- The 7-day offline period uses your device clock; setting the clock back can extend it.
 
 ## Development
 

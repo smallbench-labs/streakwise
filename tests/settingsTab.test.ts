@@ -14,6 +14,7 @@ function makeTab(get: HttpGetJson, isPro = false) {
 		license: { isConfigured: () => true, isPro: () => isPro, graceDaysLeft: () => 0, state: { ...EMPTY_LICENSE } },
 		keyStore: { kind: 'keychain' },
 		deviceCode: 'a1b2',
+		deviceLabel: 'Obsidian – Linux – a1b2',
 		saveSettings: async () => {},
 		refreshAfterSettings: () => {},
 	};
@@ -170,5 +171,6 @@ test('S-39: settings tab shows this device code', () => {
 	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
 	const sec = (tab as unknown as { licenseSection(): { rows: { name: string; desc?: string }[] } }).licenseSection();
 	const row = sec.rows.find((r) => r.name === 'This device');
-	assert.ok(row?.desc?.includes('a1b2'));
+	assert.ok(row?.desc?.includes('"Obsidian – Linux – a1b2"'));
+	assert.ok(!row?.desc?.includes('…'));
 });
