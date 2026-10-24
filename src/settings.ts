@@ -261,7 +261,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						? 'The key is stored in Obsidian Keychain, not in your vault files. '
 						: '⚠ Your Obsidian version has no Keychain, so the key is stored in plain text in this plugin\'s data.json in your vault. '
 							+ 'If your vault is synced or kept in git, the key goes with it. Update Obsidian to 1.11.4 or later to keep it in Keychain. ')
-					+ 'It is sent only to Polar (api.polar.sh) to verify it, and only when you press Activate or once a day afterwards. '
+					+ 'It is sent only to Polar (api.polar.sh): when you press Activate, then at most once a day, or on every startup while a stored key isn\'t unlocking Pro. '
 					+ 'On a new device, paste the key and press Activate; it does not activate by itself. Up to 5 devices; to free one, deactivate it in the Polar customer portal.',
 				render: (st) => {
 					st.addText((t) => {
