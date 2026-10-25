@@ -120,5 +120,9 @@
 .sw-buy-button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 .sw-consent-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-small); }
 .sw-consent-hint.sw-consent-hint-error { color: var(--text-error); }
+/* Light theme: --text-error measures below 4.5:1 on the settings background; darken it. */
+.theme-light .sw-consent-hint.sw-consent-hint-error { color: color-mix(in srgb, var(--text-error) 80%, black); }
+/* Dark theme: --text-error measures 4.496:1 on #242424; lighten slightly. */
+.theme-dark .sw-consent-hint.sw-consent-hint-error { color: color-mix(in srgb, var(--text-error) 85%, white); }
 .sw-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .sw-consent input[type="checkbox"]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }

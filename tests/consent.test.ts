@@ -102,4 +102,6 @@ test('styles: label row does not wrap the checkbox away; light-theme link uses t
 	assert.match(row, /align-items: flex-start/);
 	assert.match(css, /\.theme-light \.sw-consent-link \{ color: color-mix\(in srgb, var\(--text-accent\) 65%, black\); \}/);
 	assert.match(css, /\.sw-consent-hint\.sw-consent-hint-error \{ color: var\(--text-error\); \}/);
+	assert.match(css, /\.theme-light \.sw-consent-hint\.sw-consent-hint-error \{ color: color-mix\(in srgb, var\(--text-error\) 80%, black\); \}/);
+	assert.match(css, /\.theme-dark \.sw-consent-hint\.sw-consent-hint-error \{ color: color-mix\(in srgb, var\(--text-error\) 85%, white\); \}/);
 });
