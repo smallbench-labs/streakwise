@@ -85,13 +85,11 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 	/** Purchase consent; recreated (unchecked) every time the Pro panel is drawn, never saved. */
 	private consent: ConsentState | null = null;
 
-	/** Buy Pro click handler: refuses (returns false) unless the consent box is checked. */
-	openCheckout(): boolean {
-		return this.checkoutHandler?.() ?? false;
-	}
-
-	/** Set inside the !FREE_BUILD block only, so the free bundle has no checkout/consent code. */
-	private checkoutHandler: (() => boolean) | null = null;
+	/**
+	 * Buy Pro click handler: refuses (returns false) unless the consent box is checked.
+	 * Assigned only inside the !FREE_BUILD block (`declare`: no field is emitted), so the free bundle has none of it.
+	 */
+	declare openCheckout?: () => boolean;
 
 	private regionChecking(): boolean {
 		return (this.buyGate?.current ?? 'unknown') === 'unknown';
@@ -263,6 +261,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
+			this.openCheckout = () => !!this.consent && openCheckoutIfConsented(this.consent, CHECKOUT_URL, (u) => { window.open(u); });
 			const gate = this.buyGate ?? (this.buyGate = new BuyGate(this.regionGet ?? obsidianHttpGetJson));
 			const rows: Row[] = [{
 				name: 'Status',
@@ -282,9 +281,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 					visible: () => this.buyVisible(),
 					render: (st) => {
 						const consent = this.consent = new ConsentState();
-						this.checkoutHandler = () => openCheckoutIfConsented(consent, CHECKOUT_URL, (u) => { window.open(u); });
 						const infoEl = (st as unknown as { infoEl?: HTMLElement }).infoEl ?? st.settingEl;
-						buildConsentBlock(infoEl, consent, () => this.openCheckout(), (u) => { window.open(u); });
+						buildConsentBlock(infoEl, consent, () => this.openCheckout?.() ?? false, (u) => { window.open(u); });
 						this.legacyBuyEl = st.settingEl;
 					},
 				});

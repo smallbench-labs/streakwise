@@ -222,16 +222,16 @@ test('consent: Buy handler refuses until the box is checked; state resets when s
 		const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
 		drawDeclarative(tab);
 		await tick();
-		const t = tab as unknown as { openCheckout(): boolean; consent: { set(b: boolean): void; isChecked: boolean } | null };
-		assert.equal(t.openCheckout(), false);
+		const t = tab as unknown as { openCheckout?: () => boolean; consent: { set(b: boolean): void; isChecked: boolean } | null };
+		assert.equal(t.openCheckout!(), false);
 		assert.equal(opened.length, 0);
 		t.consent!.set(true);
-		assert.equal(t.openCheckout(), true);
+		assert.equal(t.openCheckout!(), true);
 		assert.equal(opened.length, 1);
 		tab.hide();
 		drawDeclarative(tab);
 		assert.equal(t.consent!.isChecked, false, 'unchecked again after reopening');
-		assert.equal(t.openCheckout(), false);
+		assert.equal(t.openCheckout!(), false);
 	} finally {
 		(globalThis as { window?: unknown }).window = origOpen;
 	}
