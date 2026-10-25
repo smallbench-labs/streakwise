@@ -9,10 +9,8 @@ function build() {
 	const consent = new ConsentState();
 	const bought: number[] = [];
 	const opened: string[] = [];
-	const timers: Array<() => void> = [];
-	const ui = buildConsentBlock(parent as unknown as HTMLElement, consent, () => { bought.push(1); return true; }, (u) => opened.push(u),
-		{ set: (fn) => { timers.push(fn); return timers.length; }, clear: () => {} }) as unknown as Record<string, FakeNode> & { links: FakeNode[] };
-	return { parent, consent, bought, opened, timers, ui };
+	const ui = buildConsentBlock(parent as unknown as HTMLElement, consent, () => { bought.push(1); return true; }, (u) => opened.push(u)) as unknown as Record<string, FakeNode> & { links: FakeNode[] };
+	return { parent, consent, bought, opened, ui };
 }
 
 test('consent: unchecked by default; order checkbox row, button, hint; copy', () => {
@@ -20,7 +18,7 @@ test('consent: unchecked by default; order checkbox row, button, hint; copy', ()
 	assert.equal(ui.box.checked, false);
 	assert.deepEqual(ui.block.children.map((c) => c.tag), ['label', 'button', 'div']);
 	assert.equal(ui.label.find((c) => c.hasClass('sw-consent-text'))?.textContent,
-		'I agree to the Terms of Service ↗ (opens in new window) and Privacy Policy ↗ (opens in new window).');
+		'I agree to the Terms of Service (opens in new window) and Privacy Policy (opens in new window).');
 	assert.equal(ui.hint.textContent, CONSENT_HINT);
 	assert.equal(ui.button.textContent, 'Buy Pro – US$19');
 });
@@ -40,14 +38,20 @@ test('spec 4: unchecked -> aria-disabled="true" (no disabled attr), described by
 	assert.equal(ui.hint.parentElement, ui.block, 'hint back when unchecked');
 });
 
-test('spec 5: clicking Buy while unchecked: no checkout, focus to checkbox, hint flashes error colour', () => {
+test('spec 5: clicking Buy while unchecked: no checkout, focus to checkbox, hint stays error colour until checked', () => {
 	resetFocus();
-	const { ui, bought, timers } = build();
+	const { ui, bought } = build();
 	ui.button.click();
 	assert.equal(bought.length, 0);
 	assert.equal(focused, ui.box);
 	assert.ok(ui.hint.hasClass('sw-consent-hint-error'));
-	timers.forEach((t) => t());
+	ui.button.click();
+	assert.ok(ui.hint.hasClass('sw-consent-hint-error'), 'still red, no timeout');
+	ui.box.click(); // check
+	assert.ok(!ui.hint.hasClass('sw-consent-hint-error'));
+	assert.equal(ui.hint.parentElement, null);
+	ui.box.click(); // uncheck again: hint back in muted colour
+	assert.equal(ui.hint.parentElement, ui.block);
 	assert.ok(!ui.hint.hasClass('sw-consent-hint-error'));
 });
 
@@ -68,7 +72,7 @@ test('spec 2: clicking a link opens it in a new window and does NOT toggle the c
 	for (const a of ui.links) {
 		assert.equal(a.getAttribute('target'), '_blank');
 		assert.equal(a.getAttribute('rel'), 'noopener');
-		assert.ok(a.find((c) => c.getAttribute('aria-hidden') === 'true'));
+		assert.ok(!a.textContent.includes('↗'), 'no arrow icon');
 		assert.ok(a.find((c) => c.hasClass('sw-sr-only') && c.text === ' (opens in new window)'));
 	}
 	assert.equal(TERMS_URL, 'https://formchime.com/streakwise/terms');
@@ -88,4 +92,14 @@ test('handler refuses without consent', () => {
 	c.set(true);
 	assert.equal(openCheckoutIfConsented(c, 'u', (u) => opened.push(u)), true);
 	assert.deepEqual(opened, ['u']);
+});
+
+test('styles: label row does not wrap the checkbox away; light-theme link uses the darker accent', async () => {
+	const { readFileSync } = await import('node:fs');
+	const css = readFileSync('styles.css', 'utf8');
+	const row = /\.sw-consent \{([^}]*)\}/.exec(css)?.[1] ?? '';
+	assert.ok(!/flex-wrap/.test(row));
+	assert.match(row, /align-items: flex-start/);
+	assert.match(css, /\.theme-light \.sw-consent-link \{ color: color-mix\(in srgb, var\(--text-accent\) 65%, black\); \}/);
+	assert.match(css, /\.sw-consent-hint\.sw-consent-hint-error \{ color: var\(--text-error\); \}/);
 });

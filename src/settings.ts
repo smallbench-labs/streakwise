@@ -284,8 +284,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						const consent = this.consent = new ConsentState();
 						this.checkoutHandler = () => openCheckoutIfConsented(consent, CHECKOUT_URL, (u) => { window.open(u); });
 						const infoEl = (st as unknown as { infoEl?: HTMLElement }).infoEl ?? st.settingEl;
-						buildConsentBlock(infoEl, consent, () => this.openCheckout(), (u) => { window.open(u); },
-							{ set: (fn, ms) => window.setTimeout(fn, ms), clear: (t) => window.clearTimeout(t) });
+						buildConsentBlock(infoEl, consent, () => this.openCheckout(), (u) => { window.open(u); });
 						this.legacyBuyEl = st.settingEl;
 					},
 				});

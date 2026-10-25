@@ -110,10 +110,12 @@
 
 /* Purchase consent (Settings → Pro license) */
 .sw-consent-block { display: flex; flex-direction: column; align-items: flex-start; margin-top: var(--size-4-2); }
-.sw-consent { display: flex; align-items: center; gap: var(--size-4-2); min-height: 44px; cursor: pointer; flex-wrap: wrap; }
-.sw-consent input[type="checkbox"] { margin: 0; flex: none; }
+.sw-consent { display: flex; align-items: flex-start; gap: var(--size-4-2); min-height: 44px; padding: 12px 0; box-sizing: border-box; cursor: pointer; }
+.sw-consent input[type="checkbox"] { margin: 0.2em 0 0; flex: none; }
 .sw-consent-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.sw-consent-link { color: var(--text-accent); }
+.sw-consent-link { color: var(--text-accent); text-decoration: underline; }
+/* Light theme: --text-accent (and -hover) measure ~2.6:1 on the settings background; 65% accent + black measures ≥4.5:1. */
+.theme-light .sw-consent-link { color: color-mix(in srgb, var(--text-accent) 65%, black); }
 .sw-buy-button { margin-top: 8px; }
 .sw-buy-button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 .sw-consent-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-small); }
