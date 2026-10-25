@@ -3,6 +3,8 @@ import type StreakwisePlugin from './main';
 import { EMPTY_LICENSE, LicenseCache } from './license/types';
 import { CHECKOUT_URL, HttpGetJson } from './license/checkout';
 import { BuyGate } from './license/buyGate';
+import { ConsentState, openCheckoutIfConsented } from './license/consent';
+import { buildConsentBlock } from './license/consentUi';
 import { obsidianHttpGetJson } from './license/obsidianHttp';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
@@ -69,6 +71,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 	private legacyBuyEl: HTMLElement | null = null;
 	/** Legacy display() path: the "couldn't check your region" note row. */
 	private legacyRegionNoteEl: HTMLElement | null = null;
+	/** Legacy display() path: the "Checking region…" row. */
+	private legacyCheckingEl: HTMLElement | null = null;
 
 	constructor(app: App, private plugin: StreakwisePlugin) {
 		super(app, plugin);
@@ -76,6 +80,21 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 
 	private buyVisible(): boolean {
 		return this.buyGate?.visible() ?? false;
+	}
+
+	/** Purchase consent; recreated (unchecked) every time the Pro panel is drawn, never saved. */
+	private consent: ConsentState | null = null;
+
+	/** Buy Pro click handler: refuses (returns false) unless the consent box is checked. */
+	openCheckout(): boolean {
+		return this.checkoutHandler?.() ?? false;
+	}
+
+	/** Set inside the !FREE_BUILD block only, so the free bundle has no checkout/consent code. */
+	private checkoutHandler: (() => boolean) | null = null;
+
+	private regionChecking(): boolean {
+		return (this.buyGate?.current ?? 'unknown') === 'unknown';
 	}
 
 	private regionFailed(): boolean {
@@ -94,6 +113,9 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		if (!hasDeclarativeSettings(PluginSettingTab.prototype) && this.legacyRegionNoteEl) {
 			if (this.regionFailed()) this.legacyRegionNoteEl.show(); else this.legacyRegionNoteEl.hide();
 		}
+		if (!hasDeclarativeSettings(PluginSettingTab.prototype) && this.legacyCheckingEl) {
+			if (this.regionChecking()) this.legacyCheckingEl.show(); else this.legacyCheckingEl.hide();
+		}
 	}
 
 	hide(): void {
@@ -101,6 +123,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		this.buyGate?.reset();
 		this.legacyBuyEl = null;
 		this.legacyRegionNoteEl = null;
+		this.legacyCheckingEl = null;
+		this.consent = null;
 		super.hide();
 	}
 
@@ -257,12 +281,21 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						+ 'US$19 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
 					visible: () => this.buyVisible(),
 					render: (st) => {
-						st.addButton((b) => b.setButtonText('Buy Pro – US$19').onClick(() => { window.open(CHECKOUT_URL); }));
+						const consent = this.consent = new ConsentState();
+						this.checkoutHandler = () => openCheckoutIfConsented(consent, CHECKOUT_URL, (u) => { window.open(u); });
+						const infoEl = (st as unknown as { infoEl?: HTMLElement }).infoEl ?? st.settingEl;
+						buildConsentBlock(infoEl, consent, () => this.openCheckout(), (u) => { window.open(u); },
+							{ set: (fn, ms) => window.setTimeout(fn, ms), clear: (t) => window.clearTimeout(t) });
 						this.legacyBuyEl = st.settingEl;
 					},
 				});
 				buyRows.push({
-					name: 'Get Streakwise Pro',
+					name: 'Checking region…',
+					visible: () => this.regionChecking(),
+					render: (st) => { this.legacyCheckingEl = st.settingEl; },
+				});
+				buyRows.push({
+					name: 'Streakwise Pro',
 					desc: 'Couldn\'t check your region. Reopen settings later to try again.',
 					visible: () => this.regionFailed(),
 					render: (st) => { this.legacyRegionNoteEl = st.settingEl; },

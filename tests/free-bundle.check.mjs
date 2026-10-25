@@ -11,7 +11,7 @@ const free = await build({ entryPoints: ['src/main.ts'], bundle: true, write: fa
 const code = free.outputFiles[0].text;
 
 test('free bundle: no network or Polar code', () => {
-	for (const s of ['requestUrl', 'polar.sh', 'api.polar', 'license-keys', 'fetch(', 'XMLHttpRequest', 'formchime.com/api', 'localStorage', 'deactivate', 'streakwise-device-code']) {
+	for (const s of ['requestUrl', 'polar.sh', 'api.polar', 'license-keys', 'fetch(', 'XMLHttpRequest', 'formchime.com/api', 'localStorage', 'deactivate', 'streakwise-device-code', 'I agree', 'streakwise/terms', 'Checking region', 'sw-buy-button', 'Check the box']) {
 		assert.ok(!code.includes(s), `free main.js contains "${s}"`);
 	}
 });

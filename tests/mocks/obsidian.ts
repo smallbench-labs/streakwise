@@ -1,13 +1,7 @@
 // Minimal `obsidian` stand-in for unit tests that import UI modules (aliased in `npm test`).
 // Only what settings.ts touches is implemented.
-export class FakeEl {
-	hidden = false;
-	hide() { this.hidden = true; }
-	show() { this.hidden = false; }
-	empty() {}
-	createDiv() { return new FakeEl(); }
-	appendChild() {}
-}
+import { FakeNode } from './fakeDom';
+export class FakeEl extends FakeNode {}
 type Chain = Record<string, (...a: unknown[]) => unknown>;
 function chain(): Chain {
 	const c: Chain = new Proxy({}, { get: (_t, k) => (k === 'inputEl' ? {} : () => c) }) as Chain;
@@ -17,6 +11,7 @@ export class Setting {
 	static created: Setting[] = [];
 	settingEl = new FakeEl();
 	controlEl = new FakeEl();
+	infoEl = new FakeEl();
 	name = '';
 	buttons: Array<{ text: string; click?: () => unknown }> = [];
 	constructor(_el?: unknown) { Setting.created.push(this); }

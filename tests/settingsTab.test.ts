@@ -145,7 +145,8 @@ test('legacy display(): request failure hides the button and shows the region no
 		const tab = makeTab(d.get);
 		Setting.created.length = 0;
 		tab.display();
-		const [buy, note] = Setting.created.filter((s) => s.name === 'Get Streakwise Pro');
+		const buy = Setting.created.find((s) => s.name === 'Get Streakwise Pro');
+		const note = Setting.created.find((s) => s.name === 'Streakwise Pro');
 		assert.equal(note?.settingEl.hidden, true, 'note hidden until known');
 		d.reject(new Error('offline'));
 		await tick();
@@ -194,4 +195,44 @@ test('m-01: without a key, Buy Pro stays above License key', () => {
 	const sec = (tab as unknown as { licenseSection(): { rows: { name: string }[] } }).licenseSection();
 	const names = sec.rows.map((r) => r.name);
 	assert.ok(names.indexOf('Get Streakwise Pro') < names.indexOf('License key'));
+});
+
+test('i-02 / i-03: "Checking region…" while unknown; failure row is not titled "Get Streakwise Pro"', async () => {
+	setDeclarative(true);
+	const d = deferred();
+	const tab = makeTab(d.get);
+	const defs = proDefs(tab);
+	drawDeclarative(tab);
+	const checking = defs.find((x) => x.name === 'Checking region…');
+	const note = defs.find((x) => x.desc?.startsWith('Couldn'));
+	assert.equal(checking?.visible?.(), true);
+	assert.notEqual(note?.name, 'Get Streakwise Pro');
+	d.reject(new Error('offline'));
+	await tick();
+	assert.equal(checking?.visible?.(), false);
+	assert.equal(note?.visible?.(), true);
+});
+
+test('consent: Buy handler refuses until the box is checked; state resets when settings reopen', async () => {
+	setDeclarative(true);
+	const opened: string[] = [];
+	const origOpen = (globalThis as { window?: unknown }).window;
+	(globalThis as { window?: unknown }).window = { open: (u: string) => { opened.push(u); }, setTimeout: () => 0, clearTimeout: () => {} };
+	try {
+		const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+		drawDeclarative(tab);
+		await tick();
+		const t = tab as unknown as { openCheckout(): boolean; consent: { set(b: boolean): void; isChecked: boolean } | null };
+		assert.equal(t.openCheckout(), false);
+		assert.equal(opened.length, 0);
+		t.consent!.set(true);
+		assert.equal(t.openCheckout(), true);
+		assert.equal(opened.length, 1);
+		tab.hide();
+		drawDeclarative(tab);
+		assert.equal(t.consent!.isChecked, false, 'unchecked again after reopening');
+		assert.equal(t.openCheckout(), false);
+	} finally {
+		(globalThis as { window?: unknown }).window = origOpen;
+	}
 });
