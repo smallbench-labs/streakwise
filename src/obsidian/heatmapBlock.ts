@@ -1,3 +1,4 @@
+import { moreDays } from '../core/plural';
 import { MarkdownRenderChild, Notice, setIcon } from 'obsidian';
 import { todayKey } from './time';
 import type StreakwisePlugin from '../main';
@@ -95,7 +96,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		const dups = duplicatesInRange(index.duplicates, model.range);
 		if (dups.length) {
 			const d = dups[0];
-			const more = dups.length > 1 ? ` (and ${dups.length - 1} more day(s))` : '';
+			const more = dups.length > 1 ? ` (and ${moreDays(dups.length - 1)})` : '';
 			root.createDiv({
 				cls: 'sw-message',
 				text: `${d?.day}: more than one daily note${more}. Using "${d?.used}"; ignoring ${d?.ignored.join(', ')}.`,

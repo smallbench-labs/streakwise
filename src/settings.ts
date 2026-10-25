@@ -6,7 +6,7 @@ import { BuyGate } from './license/buyGate';
 import { obsidianHttpGetJson } from './license/obsidianHttp';
 import { PALETTES, Palette } from './core/blockConfig';
 import { WeekStart } from './core/dates';
-import { dayCount } from './core/plural';
+import { moreDays } from './core/plural';
 import { SourceSettings, resolveDailySource } from './obsidian/dataSource';
 import { renderLegendSwatches } from './obsidian/renderSvg';
 import { hasDeclarativeSettings } from './settingsCompat';
@@ -67,6 +67,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 	private buyGate: BuyGate | null = null;
 	/** Legacy display() path: the drawn Buy row, toggled directly when the region is known. */
 	private legacyBuyEl: HTMLElement | null = null;
+	/** Legacy display() path: the "couldn't check your region" note row. */
+	private legacyRegionNoteEl: HTMLElement | null = null;
 
 	constructor(app: App, private plugin: StreakwisePlugin) {
 		super(app, plugin);
@@ -74,6 +76,10 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 
 	private buyVisible(): boolean {
 		return this.buyGate?.visible() ?? false;
+	}
+
+	private regionFailed(): boolean {
+		return this.buyGate?.failed() ?? false;
 	}
 
 	/** Region known: re-evaluate visibility. 1.13+: refreshDomState() (or update()); legacy: toggle the row. */
@@ -85,12 +91,16 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		} else if (this.legacyBuyEl) {
 			if (this.buyVisible()) this.legacyBuyEl.show(); else this.legacyBuyEl.hide();
 		}
+		if (!hasDeclarativeSettings(PluginSettingTab.prototype) && this.legacyRegionNoteEl) {
+			if (this.regionFailed()) this.legacyRegionNoteEl.show(); else this.legacyRegionNoteEl.hide();
+		}
 	}
 
 	hide(): void {
 		// Next time the tab opens, check the region again.
 		this.buyGate?.reset();
 		this.legacyBuyEl = null;
+		this.legacyRegionNoteEl = null;
 		super.hide();
 	}
 
@@ -225,7 +235,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		if (!FREE_BUILD && lic.isConfigured()) {
 			this.keyDraft = lic.state.key;
 			const status = lic.isPro()
-				? `Pro is active. Works offline for ${dayCount(lic.graceDaysLeft())} more.`
+				? `Pro is active. Works offline for ${moreDays(lic.graceDaysLeft())}.`
 				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
@@ -250,6 +260,12 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 						st.addButton((b) => b.setButtonText('Buy Pro – US$19').onClick(() => { window.open(CHECKOUT_URL); }));
 						this.legacyBuyEl = st.settingEl;
 					},
+				});
+				buyRows.push({
+					name: 'Get Streakwise Pro',
+					desc: 'Couldn\'t check your region. Reopen settings later to try again.',
+					visible: () => this.regionFailed(),
+					render: (st) => { this.legacyRegionNoteEl = st.settingEl; },
 				});
 			}
 			if (!keyFirst) rows.push(...buyRows);

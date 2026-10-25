@@ -6,7 +6,7 @@ import { StreakwiseSettingTab } from '../src/settings';
 import { EMPTY_LICENSE } from '../src/license/types';
 import type { HttpGetJson } from '../src/license/checkout';
 
-interface Def { name?: string; render?: (s: unknown) => void; visible?: () => boolean; type?: string; items?: Def[] }
+interface Def { name?: string; desc?: string; render?: (s: unknown) => void; visible?: () => boolean; type?: string; items?: Def[] }
 
 function makeTab(get: HttpGetJson, isPro = false) {
 	const plugin = {
@@ -54,27 +54,31 @@ function drawDeclarative(tab: StreakwiseSettingTab) {
 	const items = proDefs(tab);
 	for (const d of items) d.render?.(new Setting());
 	return {
-		buy: items.find((d) => d.name === 'Get Streakwise Pro'),
+		buy: items.find((d) => d.name === 'Get Streakwise Pro' && !!d.render && !d.desc?.startsWith('Couldn')),
+		note: items.find((d) => d.desc?.startsWith('Couldn')),
 	};
 }
 
 for (const [label, settle, expected] of [
 	['blocked -> hidden', (d: ReturnType<typeof deferred>) => d.resolve({ status: 200, json: { blocked: true } }), false],
 	['not blocked -> shown', (d: ReturnType<typeof deferred>) => d.resolve({ status: 200, json: { blocked: false } }), true],
-	['request fails -> shown', (d: ReturnType<typeof deferred>) => d.reject(new Error('offline')), true],
-	['error status -> shown', (d: ReturnType<typeof deferred>) => d.resolve({ status: 500, json: null }), true],
+	['request fails -> hidden (fail closed)', (d: ReturnType<typeof deferred>) => d.reject(new Error('offline')), false],
+	['error status -> hidden (fail closed)', (d: ReturnType<typeof deferred>) => d.resolve({ status: 500, json: null }), false],
+	['bad JSON -> hidden (fail closed)', (d: ReturnType<typeof deferred>) => d.resolve({ status: 200, json: '<html>' }), false],
 ] as const) {
 	test(`S-34 1.13+: ${label}; hidden while unknown; DOM state refreshed after the check`, async () => {
 		setDeclarative(true);
 		const d = deferred();
 		const tab = makeTab(d.get);
-		const { buy } = drawDeclarative(tab);
+		const { buy, note } = drawDeclarative(tab);
 		assert.ok(buy?.visible, 'Buy row uses the declarative visible predicate');
 		assert.equal(buy.visible(), false, 'hidden until region is known');
+		assert.equal(note?.visible?.(), false, 'note hidden until region is known');
 		const before = mockEnv.domRefreshes;
 		settle(d);
 		await tick();
 		assert.equal(buy.visible(), expected);
+		assert.equal(note?.visible?.(), label.includes('fail closed'), 'region note only when the check failed');
 		assert.equal(mockEnv.domRefreshes, before + 1, 'refreshDomState() called once after the check');
 		// A re-fetch of definitions (update()) keeps the known state without a new request.
 		const again = proDefs(tab).find((x) => x.name === 'Get Streakwise Pro');
@@ -134,17 +138,19 @@ for (const [label, json, expected] of [['blocked', { blocked: true }, true], ['a
 	});
 }
 
-test('S-34 legacy display(): request failure still shows the button', async () => {
+test('legacy display(): request failure hides the button and shows the region note', async () => {
 	setDeclarative(false);
 	try {
 		const d = deferred();
 		const tab = makeTab(d.get);
 		Setting.created.length = 0;
 		tab.display();
-		const buy = Setting.created.find((s) => s.name === 'Get Streakwise Pro');
+		const [buy, note] = Setting.created.filter((s) => s.name === 'Get Streakwise Pro');
+		assert.equal(note?.settingEl.hidden, true, 'note hidden until known');
 		d.reject(new Error('offline'));
 		await tick();
-		assert.equal(buy?.settingEl.hidden, false);
+		assert.equal(buy?.settingEl.hidden, true);
+		assert.equal(note?.settingEl.hidden, false);
 	} finally {
 		setDeclarative(true);
 	}
