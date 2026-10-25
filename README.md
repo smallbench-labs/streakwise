@@ -67,8 +67,8 @@ The command **Insert heatmap block** adds a starter block.
 - Streakwise Pro costs **US$19 (plus VAT/sales tax where applicable, calculated and shown at checkout)** and is sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
 - No account is required to use the plugin. The **Buy Pro** button opens https://formchime.com/api/checkout?product=streakwise-pro, which redirects to a Polar checkout; checkout creates a customer record with Polar (email).
 - A key can be active on **5 devices**. A new device does not activate by itself: paste the key in Settings → Streakwise → Pro license and press **Activate**. Need a 6th device? Deactivate an old one in the Polar customer portal (https://polar.sh/formchime/portal), then press **Activate** on the new device. A device released in the portal locks Pro at its next online check and is **not** re-activated automatically; press **Activate** there if you want it back. Pressing **Remove** in Streakwise also releases that device's slot (if the release can't reach Polar, the key is still removed locally and you can release the slot in the portal).
-- **Refunds:** Full refund within 14 days, just email contact@formchime.com (or reply to your Polar receipt email). After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
-- Not available in Japan. If you're charged from Japan, we refund in full and revoke the key; you can also email contact@formchime.com. The free features work everywhere.
+- **Refunds:** Full refund within 14 days, just email support@formchime.com (or reply to your Polar receipt email). After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.
+- Not available in Japan. If you're charged from Japan, we refund in full and revoke the key; you can also email support@formchime.com. The free features work everywhere.
 
 ## Network use disclosure
 
@@ -109,7 +109,7 @@ npm run lint
 
 ## Support
 
-Bugs and questions: open an issue at https://github.com/smallbench-labs/streakwise/issues. Billing and refunds: contact@formchime.com.
+Bugs and questions: open an issue at https://github.com/smallbench-labs/streakwise/issues. Billing and refunds: support@formchime.com.
 
 ## Clean-room statement
 
