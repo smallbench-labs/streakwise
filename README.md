@@ -16,7 +16,7 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 - Works in narrow panes: the grid scrolls to today, and the title and streak line wrap.
 - The free features work fully offline (see Network use disclosure for Pro).
 
-**Streakwise Pro (one-time purchase, includes all future updates, US$19 plus tax where applicable):**
+**Streakwise Pro (one-time purchase, includes all future updates, US$12 plus tax where applicable):**
 - Month and week views: see this week at a glance without scrolling a whole year. Quarter and year-to-date views too.
 - Several habits in one block: exercise, reading and sleep side by side.
 - PNG export: drop your year into a review note or share it (generated locally, no upload).
@@ -64,7 +64,7 @@ The command **Insert heatmap block** adds a starter block.
 
 - **Optional payments.** The yearly heatmap is free and complete. Streakwise Pro is an optional one-time upgrade.
 - **One-time purchase, includes all future updates.** No subscription, and your key doesn't expire. Pro checks the key with Polar at most once a day when you're online (or on every startup while a stored key isn't unlocking Pro) and keeps working for up to **7 days offline**.
-- Streakwise Pro costs **US$19 (plus VAT/sales tax where applicable, calculated and shown at checkout)** and is sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
+- Streakwise Pro costs **US$12 (plus VAT/sales tax where applicable, calculated and shown at checkout)** and is sold through **Polar** (https://polar.sh), which acts as the merchant of record and handles payment, tax and invoices. Polar emails you a license key. Obsidian does not sell or handle this payment.
 - No account is required to use the plugin. The **Buy Pro** button opens https://formchime.com/api/checkout?product=streakwise-pro, which redirects to a Polar checkout; checkout creates a customer record with Polar (email).
 - A key can be active on **5 devices**. A new device does not activate by itself: paste the key in Settings → Streakwise → Pro license and press **Activate**. Need a 6th device? Deactivate an old one in the Polar customer portal (https://polar.sh/formchime/portal), then press **Activate** on the new device. A device released in the portal locks Pro at its next online check and is **not** re-activated automatically; press **Activate** there if you want it back. Pressing **Remove** in Streakwise also releases that device's slot (if the release can't reach Polar, the key is still removed locally and you can release the slot in the portal).
 - **Refunds:** Full refund within 14 days, just email support@formchime.com (or reply to your Polar receipt email). After a refund the license key is revoked and Pro features lock again; the free yearly heatmap keeps working.

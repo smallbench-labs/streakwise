@@ -38,7 +38,7 @@ export function buildConsentBlock(
 	link('Privacy Policy', PRIVACY_URL);
 	text.appendText('.');
 
-	const button = block.createEl('button', { cls: 'sw-buy-button mod-cta', text: 'Buy Pro – US$19', attr: { type: 'button' } });
+	const button = block.createEl('button', { cls: 'sw-buy-button mod-cta', text: 'Buy Pro – US$12', attr: { type: 'button' } });
 	const hint = block.createDiv({ cls: 'sw-consent-hint', text: CONSENT_HINT, attr: { id: `${id}-hint` } });
 
 	const apply = (on: boolean) => {

@@ -20,7 +20,7 @@ test('consent: unchecked by default; order checkbox row, button, hint; copy', ()
 	assert.equal(ui.label.find((c) => c.hasClass('sw-consent-text'))?.textContent,
 		'I agree to the Terms of Service (opens in new window) and Privacy Policy (opens in new window).');
 	assert.equal(ui.hint.textContent, CONSENT_HINT);
-	assert.equal(ui.button.textContent, 'Buy Pro – US$19');
+	assert.equal(ui.button.textContent, 'Buy Pro – US$12');
 });
 
 test('spec 4: unchecked -> aria-disabled="true" (no disabled attr), described by the hint; checked removes hint', () => {

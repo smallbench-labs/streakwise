@@ -277,7 +277,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				buyRows.push({
 					name: 'Get Streakwise Pro',
 					desc: 'Flexible streaks (weekly goal, weekdays only, rest days, freezes), month, week, quarter and YTD views, several habits per block, PNG export. '
-						+ 'US$19 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
+						+ 'US$12 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
 					visible: () => this.buyVisible(),
 					render: (st) => {
 						const consent = this.consent = new ConsentState();
