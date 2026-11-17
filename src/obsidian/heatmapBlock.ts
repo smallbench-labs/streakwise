@@ -201,7 +201,10 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		}
 		menu.addSeparator();
 		menu.addItem((i) => i.setTitle('Streakwise settings').setIcon('settings').onClick(() => plugin.openSettings()));
-		menu.showAtMouseEvent(evt);
+		// Anchor to the button, so keyboard activation (no pointer position) opens it in the right place too.
+		const r = (evt.currentTarget as HTMLElement | null)?.getBoundingClientRect();
+		if (r) menu.showAtPosition({ x: r.right, y: r.bottom, left: true });
+		else menu.showAtMouseEvent(evt);
 	}
 
 	private async applyRule(rule: StreakRule) {
