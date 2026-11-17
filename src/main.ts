@@ -8,6 +8,8 @@ import { FREE_LICENSE, FREE_KEY_STORE } from './license/free';
 import { HeatmapBlock } from './obsidian/heatmapBlock';
 import { DailyNoteIndex, isInDailyFolder, resolveDailySource } from './obsidian/dataSource';
 import { sanitizeSettings } from './core/settingsSanitize';
+import { discoverProperties } from './core/discover';
+import { HabitPickerModal } from './ui/modals';
 
 export const BLOCK_LANGUAGE = 'streakwise';
 
@@ -62,15 +64,21 @@ export default class StreakwisePlugin extends Plugin {
 		}
 
 		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (source, el, ctx) => {
-			ctx.addChild(new HeatmapBlock(el, source, this));
+			ctx.addChild(new HeatmapBlock(el, source, this, ctx));
 		});
 
 		this.addCommand({
 			id: 'insert-heatmap',
 			name: 'Insert heatmap block',
 			editorCallback: (editor: Editor) => {
-				const habit = this.settings.defaultHabit || 'habit';
-				editor.replaceSelection('```' + BLOCK_LANGUAGE + '\nhabits: ' + habit + '\nview: year\n```\n');
+				const insert = (habit: string) => editor.replaceSelection('```' + BLOCK_LANGUAGE + '\nhabits: ' + habit + '\n```\n');
+				if (this.settings.defaultHabit) { insert(this.settings.defaultHabit); return; }
+				// Offer the properties the daily notes actually use, instead of a placeholder that matches nothing.
+				const found = discoverProperties(this.dailyIndex.get(resolveDailySource(this.app, this.settings)));
+				const only = found[0];
+				if (found.length === 1 && only) insert(only.name);
+				else if (found.length > 1) new HabitPickerModal(this.app, found, insert).open();
+				else insert('exercise');
 			},
 		});
 

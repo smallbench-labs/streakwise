@@ -22,7 +22,7 @@ test('free bundle: no license key field, no activate button, no purchase link', 
 });
 
 test('free bundle: no export button or PNG folder setting', () => {
-	for (const s of ['Export PNG', 'PNG export folder']) assert.ok(!code.includes(s), `free main.js contains "${s}"`);
+	for (const s of ['Export PNG', 'Export as PNG', 'PNG export folder']) assert.ok(!code.includes(s), `free main.js contains "${s}"`);
 });
 
 test('free license stand-in: Pro always locked', async () => {

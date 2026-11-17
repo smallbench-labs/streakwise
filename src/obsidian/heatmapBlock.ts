@@ -1,25 +1,34 @@
 import { moreDays } from '../core/plural';
-import { MarkdownRenderChild, Notice, setIcon } from 'obsidian';
+import { Keymap, MarkdownPostProcessorContext, MarkdownRenderChild, Menu, Notice, setIcon } from 'obsidian';
 import { todayKey } from './time';
 import type StreakwisePlugin from '../main';
 import { applyFreeLimits, parseBlockConfig } from '../core/blockConfig';
 import { buildHeatmapModel } from '../core/heatmapModel';
-import { duplicatesInRange } from '../core/dailyEntries';
-import { habitValues, resolveDailySource } from './dataSource';
+import { DedupedEntries, duplicatesInRange } from '../core/dailyEntries';
+import { DailySource, habitValues, resolveDailySource } from './dataSource';
 import { formatDailyNoteName } from '../core/noteDates';
-import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderStats, renderWeekdayAxis } from './renderSvg';
+import { fitToContent, renderExportSvg, renderGridSvg, renderLegendSwatches, renderMarkSwatch, renderWeekdayAxis } from './renderSvg';
 import type { HeatmapModel } from '../core/heatmapModel';
 import type { Palette } from '../core/blockConfig';
 import { savePngToVault, svgToPng } from './exportPng';
+import { discoverProperties, habitLabel, replaceHabitInSource, setRuleInSource } from '../core/discover';
+import { StreakRule, computeFlex, isClassicRule, ruleLabel, ruleLines, unitCount } from '../core/rules';
+import { renderSummary } from '../ui/summary';
+import { FlexPreviewModal } from '../ui/modals';
+import { rewriteBlock } from './blockSource';
+import { openOrOfferDailyNote } from './dailyNote';
+
+/** One sentence on what Pro adds; shared by the locked notes so the pitch stays consistent. */
+export const PRO_SUMMARY = 'Pro adds flexible streaks (a weekly goal, weekdays only, rest days, freezes), month, week, quarter and year-to-date views, several habits in one block, and PNG export.';
 
 /**
  * One rendered ```streakwise block. The plugin re-renders all blocks (debounced) when notes change,
  * are created, deleted or renamed, or when settings / the license change.
  */
 export class HeatmapBlock extends MarkdownRenderChild {
-	private exportInput: { model: HeatmapModel; palette: Palette; title: string } | null = null;
+	private exportInput: { model: HeatmapModel; palette: Palette; title: string; view: string; today: string } | null = null;
 
-	constructor(containerEl: HTMLElement, private readonly source: string, private readonly plugin: StreakwisePlugin) {
+	constructor(containerEl: HTMLElement, private readonly source: string, private readonly plugin: StreakwisePlugin, private readonly ctx: MarkdownPostProcessorContext | null = null) {
 		super(containerEl);
 	}
 
@@ -48,43 +57,37 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		const root = this.containerEl;
 		root.empty();
 		root.addClass('sw-block');
+		this.exportInput = null;
 
+		const source = resolveDailySource(plugin.app, s);
+		const index = plugin.dailyIndex.get(source);
 		const parsed = parseBlockConfig(this.source);
 		if (parsed.habits.length === 0) parsed.habits = s.defaultHabit ? [s.defaultHabit] : [];
 		if (parsed.habits.length === 0) {
-			root.createDiv({ cls: 'sw-message', text: 'Streakwise: add a line like "habits: run" to this block, or set a default habit in settings.' });
+			this.renderMissing(index, null);
 			return;
 		}
 
 		const isPro = plugin.license.isPro();
-		const proSoon = !plugin.license.isConfigured();
-		const { config, locked } = applyFreeLimits(parsed, isPro);
+		const proSoon = FREE_BUILD || !plugin.license.isConfigured();
+		const { config, locked, lockedRule } = applyFreeLimits(parsed, isPro);
 		const today = todayKey();
-		const source = resolveDailySource(plugin.app, s);
-		const index = plugin.dailyIndex.get(source);
+		const weekStart = config.weekStart ?? s.weekStart;
 		const data = habitValues(index, config.habits);
 		const model = buildHeatmapModel({
 			view: config.view,
 			anchor: config.anchor ?? today,
 			today,
-			weekStart: config.weekStart ?? s.weekStart,
+			weekStart,
 			habits: config.habits,
 			data,
 			max: config.max,
+			rule: config.rule,
 		});
 
 		for (const err of parsed.errors) root.createDiv({ cls: 'sw-message sw-error', text: err });
 		if (locked.length) {
-			// Callout only, no fallback grid: a second copy of the yearly heatmap in the same note is noise.
-			const callout = root.createDiv({ cls: 'sw-message sw-locked' });
-			setIcon(callout.createSpan({ cls: 'sw-locked-icon', attr: { 'aria-hidden': 'true' } }), 'lock');
-			const what = locked.join(' and ');
-			const verb = locked.length > 1 ? 'are' : 'is';
-			callout.createSpan({
-				text: proSoon
-					? `${what} ${verb} planned for Pro. In the free version, use one habit with "view: year".`
-					: `${what} ${verb} a Streakwise Pro feature. In the free version, use one habit with "view: year".`,
-			});
+			this.renderLockedView(locked, proSoon);
 			return;
 		}
 
@@ -93,6 +96,15 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			this.renderEmptyState(source.folder, source.format);
 			return;
 		}
+
+		// A habit name that no daily note uses: say so and offer the properties that do exist (fix S-first-run).
+		const missing = config.habits.filter((h) => (data.get(h)?.size ?? 0) === 0);
+		if (missing.length === config.habits.length) {
+			this.renderMissing(index, missing[0] ?? null);
+			return;
+		}
+		for (const h of missing) this.renderMissing(index, h, true);
+
 		const dups = duplicatesInRange(index.duplicates, model.range);
 		if (dups.length) {
 			const d = dups[0];
@@ -103,34 +115,161 @@ export class HeatmapBlock extends MarkdownRenderChild {
 			});
 		}
 
-		// Layout (S-11): title, stats and legend are HTML so they wrap in narrow panes;
-		// only the grid itself scrolls horizontally.
 		const palette = config.palette ?? s.palette;
-		if (config.title) root.createDiv({ cls: 'sw-title', text: config.title });
-		for (const habit of model.habits) {
-			renderStats(root, habit);
+		const visible = model.habits.filter((h) => !missing.includes(h.habit));
+		const single = visible.length === 1;
+		const canExport = !proSoon && !parsed.errors.length;
+		this.exportInput = canExport ? { model, palette, title: config.title, view: config.view, today } : null;
+
+		// Header: block title (or the habit, for a single-habit block) and the block menu.
+		const head = root.createDiv({ cls: 'sw-head' });
+		const titleText = config.title || (single && visible[0] ? habitLabel(visible[0].habit) : '');
+		head.createDiv({ cls: 'sw-title', text: titleText });
+		const menuBtn = head.createEl('button', { cls: 'clickable-icon sw-menu-btn', attr: { 'aria-label': 'Streakwise options' } });
+		setIcon(menuBtn, 'more-horizontal');
+		const first = visible[0];
+		this.registerDomEvent(menuBtn, 'click', (evt) => {
+			this.openMenu(evt, { isPro, proSoon, canExport, today, weekStart, source, index,
+				habit: first?.habit ?? '', values: first ? (data.get(first.habit) ?? new Map<string, number>()) : new Map<string, number>(), rule: config.rule });
+		});
+
+		if (lockedRule && first) this.renderRulePreview(lockedRule, data.get(first.habit) ?? new Map<string, number>(), today, weekStart, first.flex.current, proSoon);
+
+		// Layout (S-11): summary and legend are HTML so they wrap in narrow panes; only the grid scrolls.
+		for (const habit of visible) {
+			renderSummary(root, model, habit, today, !single || !!config.title);
 			// Weekday labels stay put; only the cells (and month labels) scroll.
 			const row = root.createDiv({ cls: 'sw-grid-row' });
 			const axis = renderWeekdayAxis(model);
 			if (axis) row.appendChild(axis);
 			const scroll = row.createDiv({ cls: 'sw-scroll-wrap' }).createDiv({ cls: 'sw-scroll' });
-			scroll.appendChild(renderGridSvg(model, habit, palette));
+			scroll.appendChild(renderGridSvg(model, habit, palette, today));
+			this.registerDomEvent(scroll, 'click', (evt) => {
+				const cell = (evt.target as Element | null)?.closest?.('rect[data-day]');
+				const day = cell?.getAttribute('data-day');
+				if (day) void openOrOfferDailyNote(plugin.app, day, index.byDay.get(day)?.path, source, Keymap.isModEvent(evt), today);
+			});
 			this.scrollToToday(scroll, today);
 		}
 		const legend = root.createDiv({ cls: 'sw-legend', attr: { role: 'img', 'aria-label': 'Colour scale: lighter is less, stronger is more' } });
 		legend.createSpan({ text: 'Less', attr: { 'aria-hidden': 'true' } });
 		legend.appendChild(renderLegendSwatches(palette));
 		legend.createSpan({ text: 'More', attr: { 'aria-hidden': 'true' } });
-		this.exportInput = { model, palette, title: config.title };
+		if (!isClassicRule(config.rule)) {
+			if (config.rule.days !== null) {
+				const rest = legend.createSpan({ cls: 'sw-legend-mark' });
+				rest.appendChild(renderMarkSwatch('rest', palette));
+				rest.appendText('Rest day');
+			}
+			if (config.rule.freezesPerMonth > 0) {
+				const frozen = legend.createSpan({ cls: 'sw-legend-mark' });
+				frozen.appendChild(renderMarkSwatch('frozen', palette));
+				frozen.appendText('Freeze used');
+			}
+		}
+	}
 
-		// No export on blocks with config errors or locked features: the image would not match the request.
-		// Free build (or no Polar setup): no export button at all.
-		if (FREE_BUILD || proSoon || parsed.errors.length || locked.length) return;
-		const toolbar = root.createDiv({ cls: 'sw-toolbar' });
-		const exportBtn = toolbar.createEl('button', { text: isPro ? 'Export PNG' : 'Export PNG (Pro)' });
-		exportBtn.setAttr('aria-label', isPro ? 'Export this heatmap as a PNG into your vault' : 'Exporting PNG requires Streakwise Pro');
-		exportBtn.disabled = !isPro;
-		exportBtn.onclick = () => { void this.exportPng(config.view, today); };
+	private openMenu(evt: MouseEvent, o: {
+		isPro: boolean; proSoon: boolean; canExport: boolean; today: string; weekStart: 0 | 1; source: DailySource; index: DedupedEntries;
+		habit: string; values: Map<string, number>; rule: StreakRule;
+	}) {
+		const { plugin } = this;
+		const menu = new Menu();
+		menu.addItem((i) => i.setTitle('Open today\'s daily note').setIcon('calendar-check').onClick(() => {
+			void openOrOfferDailyNote(plugin.app, o.today, o.index.byDay.get(o.today)?.path, o.source, false, o.today);
+		}));
+		if (o.habit) {
+			menu.addItem((i) => i.setTitle(o.isPro ? 'Flexible streak…' : 'Preview a flexible streak').setIcon('flame').onClick(() => {
+				new FlexPreviewModal(plugin.app, {
+					habit: o.habit, values: o.values, today: o.today, weekStart: o.weekStart, current: o.rule, proSoon: o.proSoon,
+					onApply: o.isPro ? (rule) => { void this.applyRule(rule); } : null,
+					onLearnMore: () => plugin.openSettings(),
+				}).open();
+			}));
+		}
+		// Free-only build: no export at all (esbuild drops this block).
+		if (!FREE_BUILD && !o.proSoon) {
+			menu.addSeparator();
+			menu.addItem((i) => {
+				i.setTitle(o.isPro ? 'Export as PNG' : 'Export as PNG (Pro)').setIcon('image-down');
+				if (!o.canExport) i.setDisabled(true);
+				i.onClick(() => {
+					if (o.isPro) void this.exportPng();
+					else plugin.openSettings();
+				});
+			});
+		}
+		menu.addSeparator();
+		menu.addItem((i) => i.setTitle('Streakwise settings').setIcon('settings').onClick(() => plugin.openSettings()));
+		menu.showAtMouseEvent(evt);
+	}
+
+	private async applyRule(rule: StreakRule) {
+		if (!this.ctx) return;
+		await rewriteBlock(this.plugin.app, this.ctx, this.containerEl, this.source, setRuleInSource(this.source, ruleLines(rule)));
+	}
+
+	/** Free block that asks for a flexible streak: draw the free heatmap and show what the rule would give, from real notes. */
+	private renderRulePreview(rule: StreakRule, values: Map<string, number>, today: string, weekStart: 0 | 1, classicCurrent: number, proSoon: boolean) {
+		const res = computeFlex(values, rule, today, weekStart);
+		const card = this.containerEl.createDiv({ cls: 'sw-pro-card' });
+		const head = card.createDiv({ cls: 'sw-pro-card-head' });
+		setIcon(head.createSpan({ cls: 'sw-pro-icon', attr: { 'aria-hidden': 'true' } }), 'flame');
+		head.createSpan({ cls: 'sw-pro-card-title', text: `Flexible streak · ${ruleLabel(rule)}` });
+		head.createSpan({ cls: 'sw-pro-badge', text: 'Pro' });
+		const body = card.createDiv({ cls: 'sw-pro-card-body' });
+		body.appendText('With this rule, your streak would be ');
+		body.createEl('strong', { text: unitCount(res.current, res.unit) });
+		body.appendText(` (best ${unitCount(res.longest, res.unit)}). Counting every day, it is ${unitCount(classicCurrent, 'day')}.`);
+		const actions = card.createDiv({ cls: 'sw-pro-card-actions' });
+		const btn = actions.createEl('button', { cls: 'mod-cta', text: proSoon ? 'Open settings' : 'See Streakwise Pro' });
+		this.registerDomEvent(btn, 'click', () => this.plugin.openSettings());
+		actions.createSpan({ cls: 'sw-pro-card-note', text: proSoon ? 'Flexible streaks are coming to Pro.' : 'Calculated from your own notes. Nothing is sent anywhere.' });
+	}
+
+	/** A view or several habits were requested in the free version: say what Pro adds, without a second copy of the free heatmap. */
+	private renderLockedView(locked: string[], proSoon: boolean) {
+		const card = this.containerEl.createDiv({ cls: 'sw-pro-card' });
+		const head = card.createDiv({ cls: 'sw-pro-card-head' });
+		setIcon(head.createSpan({ cls: 'sw-pro-icon', attr: { 'aria-hidden': 'true' } }), 'lock');
+		const what = locked.join(' and ');
+		head.createSpan({ cls: 'sw-pro-card-title', text: proSoon ? `${what}: planned for Streakwise Pro` : `${what}: part of Streakwise Pro` });
+		card.createDiv({ cls: 'sw-pro-card-body', text: PRO_SUMMARY });
+		const actions = card.createDiv({ cls: 'sw-pro-card-actions' });
+		const btn = actions.createEl('button', { cls: 'mod-cta', text: proSoon ? 'Open settings' : 'See Streakwise Pro' });
+		this.registerDomEvent(btn, 'click', () => this.plugin.openSettings());
+	}
+
+	/**
+	 * No usable habit: none set, or no daily note has it. Lists the properties the daily notes do have;
+	 * selecting one rewrites only the habits line of this block. `inline` = one line above the grid (multi-habit block).
+	 */
+	private renderMissing(index: DedupedEntries, habit: string | null, inline = false) {
+		const found = discoverProperties(index, 6).filter((p) => p.name.toLowerCase() !== habit?.toLowerCase());
+		const card = this.containerEl.createDiv({ cls: inline ? 'sw-message sw-missing-inline' : 'sw-empty-card' });
+		if (!inline) card.createDiv({ cls: 'sw-empty-title', text: habit ? `No daily note has “${habit}” yet` : 'Pick a habit to track' });
+		const desc = card.createDiv({ cls: inline ? '' : 'sw-empty-desc' });
+		if (inline && habit) desc.appendText(`No daily note has “${habit}” yet. `);
+		if (found.length) {
+			desc.appendText(inline ? 'Found: ' : 'Your daily notes have these properties. Select one to use it here:');
+			const chips = card.createDiv({ cls: 'sw-chips' });
+			for (const p of found) {
+				const chip = chips.createEl('button', { cls: 'sw-chip' });
+				chip.createSpan({ text: p.name });
+				chip.createSpan({ cls: 'sw-chip-count', text: String(p.notes) });
+				chip.setAttr('aria-label', `Use ${p.name} (in ${p.notes} daily notes)`);
+				this.registerDomEvent(chip, 'click', () => {
+					if (!this.ctx) return;
+					void rewriteBlock(this.plugin.app, this.ctx, this.containerEl, this.source, replaceHabitInSource(this.source, habit ?? '', p.name));
+				});
+			}
+		} else if (!inline) {
+			desc.appendText('Add a property to your daily notes, for example ');
+			desc.createEl('code', { text: 'exercise: true' });
+			desc.appendText(' or ');
+			desc.createEl('code', { text: 'reading: 30' });
+			desc.appendText(', then this heatmap fills in by itself.');
+		}
 	}
 
 	/** Hint card shown once per note; later blocks in the same note get a one-line pointer. */
@@ -195,11 +334,11 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		window.requestAnimationFrame(align);
 	}
 
-	async exportPng(view: string, today: string): Promise<string | null> {
+	async exportPng(): Promise<string | null> {
 		if (!this.exportInput || !this.plugin.license.isPro()) return null;
-		const { model, palette, title } = this.exportInput;
+		const { model, palette, title, view, today } = this.exportInput;
 		// Attach off-screen inside the block so theme CSS applies, then measure real text widths.
-		const svg = renderExportSvg(model, palette, title);
+		const svg = renderExportSvg(model, palette, title, today);
 		const holder = this.containerEl.createDiv({ cls: 'sw-export-holder' });
 		holder.appendChild(svg);
 		try {

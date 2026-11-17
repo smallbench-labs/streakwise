@@ -1,7 +1,9 @@
-import { HabitHeatmap, HeatmapModel } from '../core/heatmapModel';
+import { Cell, HabitHeatmap, HeatmapModel } from '../core/heatmapModel';
 import { LEVELS } from '../core/scale';
 import { parseKey } from '../core/dates';
 import { Palette } from '../core/blockConfig';
+import { habitLabel } from '../core/discover';
+import { monthName, unitCount } from '../core/rules';
 
 const NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -20,26 +22,34 @@ function text(parent: Element, x: number, y: number, content: string, cls: strin
 	return t;
 }
 
-function describe(value: number | null, day: string, habit: string): string {
-	return value === null ? `${day}: no entry (${habit})` : `${day}: ${value} (${habit})`;
+function describe(c: { value: number | null; day: string; future: boolean; before: boolean; mark: string | null }, habit: string): string {
+	const label = habitLabel(habit);
+	if (c.future) return `${c.day}`;
+	const state = c.mark === 'frozen' ? 'missed, covered by a freeze'
+		: c.value === null ? (c.mark === 'rest' ? 'rest day' : 'no entry')
+			: c.value > 0 ? `${c.value}` : 'not done';
+	return `${c.day} · ${label}: ${state}\nClick to open the daily note`;
 }
 
-export function statsLine(h: HabitHeatmap): string {
-	const s = h.stats;
-	return `${h.habit} · current streak ${s.currentStreak} · longest ${s.longestStreak} · ${s.doneDays}/${s.elapsedDays} days`;
+/** "in 2026", "in November 2026", "this week": the period the done-days count refers to. */
+export function periodLabel(model: HeatmapModel, today: string): string {
+	const { start, end } = model.range;
+	const year = parseKey(start).year;
+	switch (model.view) {
+		case 'year': return `in ${year}`;
+		case 'ytd': return 'so far this year';
+		case 'quarter': return `in Q${Math.floor((parseKey(start).month - 1) / 3) + 1} ${year}`;
+		case 'month': return `in ${monthName(start)} ${year}`;
+		case 'week': return start <= today && today <= end ? 'this week' : `in the week of ${start}`;
+	}
 }
 
-/** Stats as HTML: streak part and days part are separate lines in narrow panes; number+unit never split. */
-export function renderStats(parent: HTMLElement, h: HabitHeatmap) {
-	const s = h.stats;
-	const row = parent.createDiv({ cls: 'sw-stats', attr: { 'aria-label': statsLine(h) } });
-	const streak = row.createSpan({ cls: 'sw-stats-streak' });
-	streak.appendText(`${h.habit} · `);
-	streak.createSpan({ cls: 'sw-nowrap', text: `current streak ${s.currentStreak}` });
-	streak.appendText(' · ');
-	streak.createSpan({ cls: 'sw-nowrap', text: `longest ${s.longestStreak}` });
-	row.createSpan({ cls: 'sw-stats-sep', text: ' · ' });
-	row.createSpan({ cls: 'sw-stats-days sw-nowrap', text: `${s.doneDays}/${s.elapsedDays} days` });
+/** One line for screen readers and the PNG export, e.g. "Exercise: 12-day streak · best 21 days · 112 of 321 days in 2026 (35%)". */
+export function statsLine(h: HabitHeatmap, model?: HeatmapModel, today = ''): string {
+	const f = h.flex, s = h.stats;
+	const pct = s.elapsedDays ? Math.round((s.doneDays / s.elapsedDays) * 100) : 0;
+	const period = model ? ` ${periodLabel(model, today)}` : '';
+	return `${habitLabel(h.habit)}: ${f.current}-${f.unit} streak · best ${unitCount(f.longest, f.unit)} · ${s.doneDays} of ${s.elapsedDays} days${period} (${pct}%)`;
 }
 
 /** Calendar layout (rows = weeks) for month/week; GitHub-style layout (columns = weeks) otherwise. */
@@ -83,13 +93,16 @@ function drawGrid(parent: Element, model: HeatmapModel, habit: HabitHeatmap, x: 
 	return { width: left + weeks.length * step, height: 14 + 7 * step };
 }
 
-function drawCell(g: Element, c: { day: string; value: number | null; level: number; future: boolean }, x: number, y: number, size: number, habit: string) {
+function drawCell(g: Element, c: Cell, x: number, y: number, size: number, habit: string) {
 	const cls = ['sw-cell', `sw-l${c.level}`];
-	if (c.value === null) cls.push('sw-nodata');
 	if (c.future) cls.push('sw-future');
+	else if (c.before && c.value === null) cls.push('sw-before');
+	else if (c.mark === 'frozen') cls.push('sw-frozen');
+	else if (c.mark === 'rest' && c.level === 0) cls.push('sw-rest');
+	else if (c.value === null) cls.push('sw-nodata');
 	// Inset by 0.5 so the 1px border of empty cells is not clipped.
 	const r = el('rect', { x: x + 0.5, y: y + 0.5, width: size - 1, height: size - 1, rx: size > 15 ? 4 : 2, class: cls.join(' '), 'data-day': c.day }, g);
-	el('title', {}, r).textContent = describe(c.value, c.day, habit);
+	el('title', {}, r).textContent = describe(c, habit);
 }
 
 function sized(svg: SVGSVGElement, width: number, height: number) {
@@ -114,8 +127,8 @@ function scaled(svg: SVGSVGElement): SVGSVGElement {
 }
 
 /** On-screen grid for one habit. Title, stats and legend are HTML around it so they wrap (S-11). */
-export function renderGridSvg(model: HeatmapModel, habit: HabitHeatmap, palette: Palette): SVGSVGElement {
-	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, role: 'img', 'aria-label': statsLine(habit) });
+export function renderGridSvg(model: HeatmapModel, habit: HabitHeatmap, palette: Palette, today = ''): SVGSVGElement {
+	const svg = el('svg', { class: `sw-svg sw-clickable sw-palette-${palette}`, role: 'img', 'aria-label': statsLine(habit, model, today) });
 	const size = drawGrid(svg, model, habit, 1, 1, isCalendar(model));
 	return scaled(sized(svg, size.width + 2, size.height + 2));
 }
@@ -131,6 +144,13 @@ export function renderWeekdayAxis(model: HeatmapModel): SVGSVGElement | null {
 	return scaled(sized(svg, 28, 14 + 7 * 12 + 2));
 }
 
+/** One legend swatch for a flexible-streak day mark (rest day or freeze). */
+export function renderMarkSwatch(kind: 'rest' | 'frozen', palette: Palette): SVGSVGElement {
+	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, 'aria-hidden': 'true' });
+	el('rect', { x: 0.5, y: 0.5, width: 9, height: 9, rx: 2, class: `sw-cell sw-l0 sw-${kind}` }, svg);
+	return scaled(sized(svg, 10, 10));
+}
+
 /** The five legend swatches (no text; "Less"/"More" are HTML). */
 export function renderLegendSwatches(palette: Palette): SVGSVGElement {
 	const svg = el('svg', { class: `sw-svg sw-palette-${palette}`, 'aria-hidden': 'true' });
@@ -143,13 +163,13 @@ export function renderLegendSwatches(palette: Palette): SVGSVGElement {
  * Self-contained SVG for PNG export: title, stats, grids and legend.
  * Its width is a rough estimate; call fitToContent() once it is in the DOM.
  */
-export function renderExportSvg(model: HeatmapModel, palette: Palette, title: string): SVGSVGElement {
+export function renderExportSvg(model: HeatmapModel, palette: Palette, title: string, today = ''): SVGSVGElement {
 	const svg = el('svg', { class: `sw-svg sw-palette-${palette}` });
 	const pad = 8;
 	let y = pad;
 	if (title) { text(svg, pad, y + 14, title, 'sw-svg-title'); y += 24; }
 	for (const habit of model.habits) {
-		text(svg, pad, y + 12, statsLine(habit), 'sw-svg-stats');
+		text(svg, pad, y + 12, statsLine(habit, model, today), 'sw-svg-stats');
 		y += 22;
 		y += drawGrid(svg, model, habit, pad, y).height + 8;
 	}

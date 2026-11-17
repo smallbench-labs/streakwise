@@ -1,7 +1,12 @@
 /* Streakwise: theme-aware heatmap colours. Level 0 = not done; 1..4 = increasing intensity.
    Sequential ramps: lightness changes with the level, so levels do not rely on hue alone. */
 
-.sw-block { margin: var(--size-4-2) 0; container-type: inline-size; }
+.sw-block {
+	margin: var(--size-4-2) 0; container-type: inline-size;
+	padding: var(--size-4-3) var(--size-4-4) var(--size-4-3);
+	border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l);
+	background: var(--background-primary);
+}
 .sw-grid-row { display: flex; align-items: flex-start; font-size: var(--font-ui-small); }
 .sw-weekday-axis { flex: none; }
 .sw-scroll { overflow-x: auto; font-size: var(--font-ui-small); }
@@ -33,7 +38,14 @@
 /* S-12/S-16: empty cells get an opaque --text-muted border (~3:1+ on #1e1e1e) so they stay visible on any background. */
 .sw-cell.sw-l0 { fill: var(--background-secondary); stroke: var(--text-muted); stroke-width: 1; }
 .sw-cell.sw-nodata { fill: var(--background-primary); stroke-dasharray: 2 1.5; }
-.sw-cell.sw-future { opacity: 0.3; }
+/* Days that cannot be missed yet (future) or were before tracking started: a faint tile, no border,
+   so the days that count stand out. They are context, not data. */
+.sw-cell.sw-future, .sw-cell.sw-before { fill: var(--background-modifier-border); stroke: none; opacity: 0.45; }
+/* Flexible streaks: a rest day is a plain light tile (nothing was expected); a freeze keeps the streak alive and is outlined in the accent. */
+.sw-cell.sw-rest { fill: var(--background-modifier-border); stroke: none; }
+.sw-cell.sw-frozen { fill: var(--background-primary); stroke: var(--sw-2); stroke-width: 1.5; stroke-dasharray: none; }
+.sw-svg.sw-clickable .sw-cell:not(.sw-future) { cursor: pointer; }
+.sw-svg.sw-clickable .sw-cell:not(.sw-future):hover { stroke: var(--text-normal); stroke-width: 1.5; stroke-dasharray: none; }
 
 /* S-12: every filled level has >= 3:1 contrast against the default light (#ffffff) and dark (#1e1e1e)
    backgrounds; --sw-on-N is the day-number colour for that level (>= 4.5:1). Checked by tests/contrast.test.ts. */
@@ -73,35 +85,92 @@
 .sw-cell.sw-l3 { fill: var(--sw-3); }
 .sw-cell.sw-l4 { fill: var(--sw-4); }
 
-.sw-title { font-weight: var(--font-semibold); font-size: var(--font-ui-medium); color: var(--text-normal); overflow-wrap: anywhere; margin-bottom: var(--size-4-1); }
-.sw-stats { font-size: var(--font-ui-small); color: var(--text-normal); margin-bottom: var(--size-4-1); }
+.sw-head { display: flex; align-items: center; gap: var(--size-4-2); margin: calc(-1 * var(--size-4-1)) calc(-1 * var(--size-4-2)) 0 0; }
+.sw-title { flex: 1 1 auto; min-width: 0; font-weight: var(--font-semibold); font-size: var(--font-ui-medium); color: var(--text-normal); overflow-wrap: anywhere; }
+.sw-menu-btn { flex: none; color: var(--text-faint); }
+.sw-menu-btn:hover { color: var(--text-normal); }
 .sw-nowrap { white-space: nowrap; }
-/* Narrow panes: streak part and days part on two lines instead of breaking inside "171/294 days". */
-@container (max-width: 420px) {
-	.sw-stats-streak, .sw-stats-days { display: block; }
-	.sw-stats-sep { display: none; }
+
+/* Summary: the streak is the headline; everything else is quiet context. */
+.sw-summary { margin: var(--size-4-1) 0 var(--size-4-3); }
+.sw-summary + .sw-grid-row { margin-top: 0; }
+.sw-grid-row + .sw-summary { margin-top: var(--size-4-4); padding-top: var(--size-4-3); border-top: 1px solid var(--background-modifier-border); }
+.sw-habit-name { font-size: var(--font-ui-small); font-weight: var(--font-semibold); color: var(--text-muted); margin-bottom: 2px; }
+.sw-summary-top { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--size-4-3) var(--size-4-6); flex-wrap: wrap; }
+.sw-hero { display: flex; align-items: baseline; gap: var(--size-2-3); line-height: 1; }
+.sw-hero-num { font-size: 2.6em; font-weight: 700; letter-spacing: -0.02em; color: var(--text-normal); font-variant-numeric: tabular-nums; }
+.sw-hero-unit { font-size: var(--font-ui-small); color: var(--text-muted); }
+.sw-week { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.sw-week-label { display: flex; gap: var(--size-2-3); font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.sw-week-count { color: var(--text-normal); font-weight: var(--font-semibold); font-variant-numeric: tabular-nums; }
+.sw-week-dots { display: flex; align-items: center; gap: 4px; }
+.sw-dot { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--background-modifier-border-hover); }
+.sw-dot-done { background: var(--interactive-accent); border-color: var(--interactive-accent); }
+.sw-dot-today { border-color: var(--interactive-accent); border-style: dashed; }
+.sw-dot-missed { border-color: var(--text-faint); }
+.sw-dot-frozen { border-color: var(--interactive-accent); }
+.sw-dot-rest, .sw-dot-future { border-color: var(--background-modifier-border); }
+.sw-dot-rest { border-style: dotted; }
+.sw-dot-extra { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.sw-sub { margin-top: var(--size-4-2); font-size: var(--font-ui-small); color: var(--text-muted); }
+.sw-rule-chip { white-space: nowrap; padding: 1px 6px; border-radius: var(--radius-s); background: var(--background-modifier-hover); color: var(--text-normal); }
+.sw-nudge { margin-top: 2px; font-size: var(--font-ui-small); color: var(--text-accent); }
+.theme-light .sw-nudge { color: color-mix(in srgb, var(--text-accent) 70%, black); }
+@container (max-width: 360px) {
+	.sw-week { align-items: flex-start; }
+	.sw-sub > span { display: block; }
+	.sw-sub > .sw-sub-sep { display: none; }
 }
 .sw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: var(--size-4-1); }
 .sw-legend svg { flex: none; }
 .sw-legend span { white-space: nowrap; }
+.sw-legend-mark { display: inline-flex; align-items: center; gap: 4px; margin-left: var(--size-4-3); }
 .sw-message { font-size: var(--font-ui-small); color: var(--text-muted); margin-bottom: var(--size-4-2); }
 .sw-message.sw-error { color: var(--text-error); }
-.sw-message.sw-locked {
-	display: flex; align-items: flex-start; gap: var(--size-4-2);
-	color: var(--text-muted); background: var(--background-secondary);
-	border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s);
-	padding: var(--size-4-2) var(--size-4-3);
-}
-.sw-locked-icon { display: flex; flex: none; color: var(--text-muted); }
-.sw-locked-icon svg { width: var(--icon-s); height: var(--icon-s); }
 .sw-empty-card {
 	background: var(--background-secondary); border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m); padding: var(--size-4-3); color: var(--text-muted); font-size: var(--font-ui-small);
 }
 .sw-empty-title { color: var(--text-normal); font-weight: var(--font-semibold); font-size: var(--font-ui-medium); margin-bottom: var(--size-4-1); }
 .sw-empty-desc { margin-bottom: var(--size-4-2); }
+/* Inside the block frame the hint needs no second frame. */
+.sw-block > .sw-empty-card { border: none; background: none; padding: 0; }
 .sw-swatch-preview { display: flex; align-items: center; font-size: var(--font-ui-small); margin-right: var(--size-4-2); }
-.sw-toolbar { margin-top: var(--size-4-2); }
+.sw-chips { display: flex; flex-wrap: wrap; gap: var(--size-4-1); margin-top: var(--size-4-2); }
+.sw-missing-inline .sw-chips { display: inline-flex; margin: 0 0 0 var(--size-4-1); }
+button.sw-chip { display: inline-flex; align-items: center; gap: 6px; height: auto; padding: 3px 10px; border-radius: 999px; font-size: var(--font-ui-small); box-shadow: none; border: 1px solid var(--background-modifier-border); background: var(--background-primary); color: var(--text-normal); cursor: pointer; }
+button.sw-chip:hover { border-color: var(--interactive-accent); }
+.sw-chip-count { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* Pro card: says what Pro adds, with the user's own numbers when a rule is previewed. */
+.sw-pro-card {
+	margin: var(--size-4-2) 0 var(--size-4-3); padding: var(--size-4-3);
+	border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m);
+	background: var(--background-secondary); font-size: var(--font-ui-small); color: var(--text-muted);
+}
+.sw-pro-card-head { display: flex; align-items: center; gap: var(--size-4-2); color: var(--text-normal); font-weight: var(--font-semibold); }
+.sw-pro-icon { display: flex; color: var(--text-accent); }
+.sw-pro-icon svg { width: var(--icon-s); height: var(--icon-s); }
+.sw-pro-badge { margin-left: auto; font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); padding: 1px 6px; border-radius: var(--radius-s); color: var(--text-on-accent); background: var(--interactive-accent); }
+.sw-pro-card-body { margin: var(--size-4-1) 0 var(--size-4-2); }
+.sw-pro-card-body strong { color: var(--text-normal); }
+.sw-pro-card-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--size-4-2) var(--size-4-3); }
+.sw-pro-card-note { font-size: var(--font-ui-smaller); color: var(--text-faint); }
+
+/* Dialogs */
+.sw-suggest-note { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.sw-modal-path { font-family: var(--font-monospace); font-size: var(--font-ui-small); color: var(--text-muted); }
+.sw-preview-lead { color: var(--text-muted); margin-top: 0; }
+.sw-preview-table { display: grid; grid-template-columns: minmax(10em, 1.6fr) repeat(3, minmax(5em, 1fr)); font-size: var(--font-ui-small); }
+.sw-preview-table.sw-with-actions { grid-template-columns: minmax(10em, 1.6fr) repeat(3, minmax(5em, 1fr)) auto; }
+.sw-preview-row { display: contents; }
+.sw-preview-row > div { padding: 8px 6px; border-bottom: 1px solid var(--background-modifier-border); display: flex; align-items: center; }
+.sw-preview-head > div:not(:first-child) { justify-content: flex-end; text-align: right; }
+.sw-preview-head > div { color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
+.sw-preview-num { justify-content: flex-end; font-variant-numeric: tabular-nums; color: var(--text-normal); }
+.sw-preview-muted { color: var(--text-muted); }
+.sw-preview-now { margin-left: 6px; font-size: var(--font-ui-smaller); padding: 0 5px; border-radius: var(--radius-s); background: var(--background-modifier-hover); color: var(--text-muted); }
+.sw-preview-foot p { font-size: var(--font-ui-small); }
 
 @media (forced-colors: active) {
 	.sw-cell { stroke: CanvasText; }

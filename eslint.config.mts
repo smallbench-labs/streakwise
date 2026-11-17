@@ -40,7 +40,7 @@ export default defineConfig(
 			'obsidianmd/ui/sentence-case': ['warn', {
 				brands: ['Streakwise', 'Streakwise Pro', 'Pro', 'Polar', 'Obsidian', 'Keychain'],
 				// Buy button shows the price (currency code US$), wording set by Obsidian PM.
-				ignoreRegex: ['^[YMDHhms/ .-]+$', '^Buy Pro – US\\$\\d+$'],
+				ignoreRegex: ['^[YMDHhms/ .-]+$', '^Buy Pro – US\\$\\d+$', '^[a-z]+: (true|\\d+)$'],
 			}],
 		},
 	},

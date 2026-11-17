@@ -258,7 +258,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			this.keyDraft = lic.state.key;
 			const status = lic.isPro()
 				? `Pro is active. Works offline for ${moreDays(lic.graceDaysLeft())}.`
-				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap, one habit per block).';
+				: lic.state.status === 'invalid' ? 'Pro is locked: this key isn\'t active.' : 'You\'re on the free version (yearly heatmap and daily streak, one habit per block).';
 			const needsBuy = !lic.isPro();
 			// Referenced only inside this !FREE_BUILD block so the free bundle has no network code.
 			this.openCheckout = () => !!this.consent && openCheckoutIfConsented(this.consent, CHECKOUT_URL, (u) => { window.open(u); });
@@ -276,7 +276,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				// S-34: hidden until the region is known; shown if the request fails; hidden if blocked.
 				buyRows.push({
 					name: 'Get Streakwise Pro',
-					desc: 'Month, week, quarter and YTD views, several habits per block, PNG export. '
+					desc: 'Flexible streaks (weekly goal, weekdays only, rest days, freezes), month, week, quarter and YTD views, several habits per block, PNG export. '
 						+ 'US$19 once (plus tax), all future updates, 5 devices, 14-day refund; not available in Japan (see README).',
 					visible: () => this.buyVisible(),
 					render: (st) => {
@@ -307,7 +307,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			}
 			rows.push({
 				name: 'License key',
-				desc: 'Pro adds month, week, quarter and year-to-date views, multiple habits and PNG export. '
+				desc: 'Pro adds flexible streaks, month, week, quarter and year-to-date views, multiple habits and PNG export. '
 					+ (this.plugin.keyStore.kind === 'keychain'
 						? 'The key is stored in Obsidian Keychain, not in your vault files. '
 						: '⚠ Your Obsidian version has no Keychain, so the key is stored in plain text in this plugin\'s data.json in your vault. '
@@ -339,7 +339,7 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 			heading: 'Pro',
 			rows: [{
 				name: 'Streakwise Pro — coming soon',
-				desc: 'Free version: yearly heatmap of one habit. Planned for Pro: month, week, quarter and '
+				desc: 'Free version: yearly heatmap and daily streak of one habit. Planned for Pro: flexible streaks, month, week, quarter and '
 					+ 'year-to-date views, multiple habits and PNG export.',
 			}],
 		};

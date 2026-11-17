@@ -23,3 +23,13 @@ export function parseStrictDate(text: string, format: string): string | null {
 	const d = m(text, format, true);
 	return d.isValid() ? d.format('YYYY-MM-DD') : null;
 }
+
+/** Format a YYYY-MM-DD day with a moment format (e.g. "dddd, LL" or a daily-note format). */
+export function formatDay(day: string, format: string): string {
+	return m(day, 'YYYY-MM-DD', true).format(format);
+}
+
+/** Current local time as HH:mm (daily-note template {{time}}). */
+export function nowTime(): string {
+	return m().format('HH:mm');
+}
