@@ -117,4 +117,4 @@ Written from scratch.
 
 ## License
 
-MIT © 2026 Smallbench Labs (Roger Chang) (see LICENSE).
+MIT © 2026 Smallbench Labs
