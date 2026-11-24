@@ -1,10 +1,10 @@
 # Streakwise
 
-Turn the habit properties already in your daily notes, like `exercise: 30 min` or `reading: true`, into a GitHub-style yearly heatmap with your current and longest streak, with no new note format to learn.
+![A free Streakwise heatmap: 21-day streak, this week 2/7, best streak and days done in 2026](shots/31_free_yearly_heatmap_0.3.0.png)
 
-For anyone who tracks habits in daily notes and wants a visual check without adding a separate app. The yearly heatmap is free and works offline. Pro adds more views, multiple habits per block, and PNG export.
+*Streakwise 0.3.0 (free), rendered in Obsidian with demo data.*
 
-![Yearly heatmap of an exercise habit with current and longest streak](shots/10_free_yearly_heatmap.png)
+Turn the habit properties already in your daily notes, like `exercise: 30 min` or `reading: true`, into a yearly heatmap with your current streak, with no new note format to learn. **Free:** a yearly heatmap and daily streak for one habit per block, this week at a glance, property suggestions from your notes, and click a day to open its note; it works offline. **Pro** (US$12 once, plus tax where applicable; no subscription) adds flexible streaks (weekly goal, weekdays only or rest days, freezes, minimum amount), month, week, quarter and year-to-date views, several habits in one block, and PNG export.
 
 ![Typing "exercise: 45 min" in today's daily note adds a cell to the heatmap](shots/free_heatmap_updates.gif)
 
@@ -17,6 +17,7 @@ For anyone who tracks habits in daily notes and wants a visual check without add
 - The free features work fully offline (see Network use disclosure for Pro).
 
 **Streakwise Pro (one-time purchase, includes all future updates, US$12 plus tax where applicable):**
+- Flexible streaks: a weekly goal (`goal: 3/week`), weekdays only or your own rest days (`days: weekdays`, `rest: sun`), freezes (`freezes: 2/month`) and a minimum amount (`min: 30`). In the free version, the block's ⋯ menu → **Preview a flexible streak** shows what your streak would be under each rule.
 - Month and week views: see this week at a glance without scrolling a whole year. Quarter and year-to-date views too.
 - Several habits in one block: exercise, reading and sleep side by side.
 - PNG export: drop your year into a review note or share it (generated locally, no upload).
