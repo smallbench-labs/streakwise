@@ -15,6 +15,7 @@ import { discoverProperties, habitLabel, replaceHabitInSource, setRuleInSource }
 import { StreakRule, computeFlex, isClassicRule, ruleLabel, ruleLines, unitCount } from '../core/rules';
 import { renderSummary } from '../ui/summary';
 import { FlexPreviewModal } from '../ui/modals';
+import { renderProHint, shouldShowProHint } from '../ui/proHint';
 import { rewriteBlock } from './blockSource';
 import { openOrOfferDailyNote } from './dailyNote';
 
@@ -167,6 +168,19 @@ export class HeatmapBlock extends MarkdownRenderChild {
 				frozen.appendText('Freeze used');
 			}
 		}
+		// One quiet, dismissible line on what Pro adds; never in the free-only build, never next to a Pro card.
+		if (!FREE_BUILD && shouldShowProHint({ isPro, proSoon, dismissed: s.proHintDismissed, proCardShown: !!lockedRule, hasErrors: parsed.errors.length > 0 })) {
+			renderProHint(root, {
+				open: () => plugin.openSettings(),
+				dismiss: () => { void this.dismissProHint(); },
+			}, (el, name) => setIcon(el, name));
+		}
+	}
+
+	private async dismissProHint() {
+		this.plugin.settings.proHintDismissed = true;
+		await this.plugin.saveSettings();
+		this.plugin.refreshBlocks();
 	}
 
 	private openMenu(evt: MouseEvent, o: {

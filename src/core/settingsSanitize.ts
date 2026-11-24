@@ -10,6 +10,8 @@ export interface PlainSettings {
 	weekStart: WeekStart;
 	palette: Palette;
 	exportFolder: string;
+	/** The quiet Pro line under free heatmaps was closed (never shown again). */
+	proHintDismissed: boolean;
 }
 
 const str = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback);
@@ -32,5 +34,6 @@ export function sanitizeSettings(raw: Record<string, unknown>, defaults: PlainSe
 		weekStart: ws === 0 || ws === 1 ? ws : defaults.weekStart,
 		palette: (PALETTES as readonly string[]).includes(pal) ? pal as Palette : defaults.palette,
 		exportFolder: str(raw.exportFolder, defaults.exportFolder).trim() || defaults.exportFolder,
+		proHintDismissed: typeof raw.proHintDismissed === 'boolean' ? raw.proHintDismissed : defaults.proHintDismissed,
 	};
 }

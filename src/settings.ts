@@ -18,6 +18,7 @@ export interface StreakwiseSettings extends SourceSettings {
 	weekStart: WeekStart;
 	palette: Palette;
 	exportFolder: string;
+	proHintDismissed: boolean;
 	license: LicenseCache;
 }
 
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: StreakwiseSettings = {
 	weekStart: 1,
 	palette: 'accent',
 	exportFolder: 'Streakwise exports',
+	proHintDismissed: false,
 	license: { ...EMPTY_LICENSE },
 };
 

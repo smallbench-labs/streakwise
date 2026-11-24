@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sanitizeSettings, PlainSettings } from '../src/core/settingsSanitize';
 
-const D: PlainSettings = { sourceMode: 'auto', customFolder: '', customFormat: 'YYYY-MM-DD', defaultHabit: '', weekStart: 1, palette: 'accent', exportFolder: 'Streakwise exports' };
+const D: PlainSettings = { sourceMode: 'auto', customFolder: '', customFormat: 'YYYY-MM-DD', defaultHabit: '', weekStart: 1, palette: 'accent', exportFolder: 'Streakwise exports', proHintDismissed: false };
 
 test('S-25: weekStart "1"/"0" coerced, invalid falls back', () => {
 	assert.equal(sanitizeSettings({ weekStart: '1' }, D).weekStart, 1);
