@@ -1,7 +1,7 @@
 {
 	"id": "streakwise",
 	"name": "Streakwise",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"minAppVersion": "1.5.0",
 	"description": "Turn habit properties in your daily notes into a yearly heatmap with streaks. Optional Pro upgrade.",
 	"author": "Smallbench Labs",
