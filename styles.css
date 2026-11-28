@@ -187,6 +187,8 @@ button.sw-chip:hover { border-color: var(--interactive-accent); }
 .sw-export-holder { position: absolute; left: -10000px; top: 0; visibility: hidden; }
 
 /* Purchase consent (Settings → Pro license) */
+a.sw-pro-learn-more { display: block; margin-top: var(--size-2-1); color: var(--text-accent); text-decoration: underline; }
+.theme-light a.sw-pro-learn-more { color: color-mix(in srgb, var(--text-accent) 65%, black); }
 .sw-consent-block { display: flex; flex-direction: column; align-items: flex-start; margin-top: var(--size-4-2); }
 .sw-consent { display: flex; align-items: flex-start; gap: var(--size-4-2); min-height: 44px; padding: 12px 0; box-sizing: border-box; cursor: pointer; }
 .sw-consent input[type="checkbox"] { margin: 0.2em 0 0; flex: none; }

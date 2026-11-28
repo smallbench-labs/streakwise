@@ -12,6 +12,7 @@ import { moreDays } from './core/plural';
 import { SourceSettings, resolveDailySource } from './obsidian/dataSource';
 import { renderLegendSwatches } from './obsidian/renderSvg';
 import { hasDeclarativeSettings } from './settingsCompat';
+import { appendLearnMoreLink, proConsentIsShown, scrollProSectionIntoView } from './ui/proScroll';
 
 export interface StreakwiseSettings extends SourceSettings {
 	defaultHabit: string;
@@ -80,6 +81,30 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
+	/** Set when openSettings({ scrollToPro: true }) runs; cleared once consent is in view or the tab hides. */
+	private pendingScrollToPro = false;
+
+	/** Opened from the free heatmap Pro hint: scroll to Pro / consent after the tab is drawn. */
+	scheduleScrollToPro() {
+		this.pendingScrollToPro = true;
+		const tick = (n: number) => {
+			if (!this.pendingScrollToPro && n > 0) return;
+			this.scrollToProSection();
+			if (this.pendingScrollToPro && n < 25) {
+				window.setTimeout(() => tick(n + 1), 50);
+			}
+		};
+		if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(() => tick(0));
+		else tick(0);
+	}
+
+	scrollToProSection(): boolean {
+		const ok = scrollProSectionIntoView(this.containerEl);
+		if (proConsentIsShown(this.containerEl)) this.pendingScrollToPro = false;
+		else if (this.buyGate && this.buyGate.current !== 'unknown') this.pendingScrollToPro = false;
+		return ok;
+	}
+
 	private buyVisible(): boolean {
 		return this.buyGate?.visible() ?? false;
 	}
@@ -116,10 +141,15 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		if (!hasDeclarativeSettings(PluginSettingTab.prototype) && this.legacyCheckingEl) {
 			if (this.regionChecking()) this.legacyCheckingEl.show(); else this.legacyCheckingEl.hide();
 		}
+		if (this.pendingScrollToPro) {
+			if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(() => { this.scrollToProSection(); });
+			else this.scrollToProSection();
+		}
 	}
 
 	hide(): void {
 		// Next time the tab opens, check the region again.
+		this.pendingScrollToPro = false;
 		this.buyGate?.reset();
 		this.legacyBuyEl = null;
 		this.legacyRegionNoteEl = null;
@@ -165,7 +195,8 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		for (const sec of this.sections()) {
-			new Setting(containerEl).setName(sec.heading).setHeading();
+			const heading = new Setting(containerEl).setName(sec.heading).setHeading();
+			if (sec.heading === 'Pro license' || sec.heading === 'Pro') heading.settingEl.addClass('sw-pro-section');
 			for (const r of sec.rows) {
 				const setting = new Setting(containerEl).setName(r.name);
 				if (r.desc !== undefined) setting.setDesc(r.desc);
@@ -269,7 +300,11 @@ export class StreakwiseSettingTab extends PluginSettingTab {
 				name: 'Status',
 				desc: lic.state.message ? `${status} ${lic.state.message}` : status,
 				// The region check starts only when the Pro panel is actually drawn (never during search indexing).
-				render: needsBuy ? () => { void gate.ensure(() => this.onRegionSettled()); } : undefined,
+				render: needsBuy ? (st) => {
+					void gate.ensure(() => this.onRegionSettled());
+					const host = (st as unknown as { descEl?: HTMLElement }).descEl ?? st.settingEl;
+					appendLearnMoreLink(host);
+				} : undefined,
 			}];
 			// m-01: a user who already has a key (e.g. device released) needs Activate first; Buy Pro goes below it.
 			const keyFirst = !!lic.state.key;

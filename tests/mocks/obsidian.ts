@@ -12,6 +12,7 @@ export class Setting {
 	settingEl = new FakeEl();
 	controlEl = new FakeEl();
 	infoEl = new FakeEl();
+	descEl = new FakeEl();
 	name = '';
 	buttons: Array<{ text: string; click?: () => unknown }> = [];
 	constructor(_el?: unknown) { Setting.created.push(this); }

@@ -26,6 +26,7 @@ export default class StreakwisePlugin extends Plugin {
 	readonly blocks = new Set<HeatmapBlock>();
 	/** One shared scan of daily notes for all blocks. */
 	dailyIndex!: DailyNoteIndex;
+	settingTab!: StreakwiseSettingTab;
 
 	async onload() {
 		await this.loadSettings();
@@ -82,7 +83,8 @@ export default class StreakwisePlugin extends Plugin {
 			},
 		});
 
-		this.addSettingTab(new StreakwiseSettingTab(this.app, this));
+		this.settingTab = new StreakwiseSettingTab(this.app, this);
+		this.addSettingTab(this.settingTab);
 
 		// Background license re-check only when a key exists; never blocks startup.
 		// S-33: also record lastSeen on load and hourly (forward-only), and re-check when due or the clock went back.
@@ -95,11 +97,12 @@ export default class StreakwisePlugin extends Plugin {
 	}
 
 	/** Open this plugin's tab in Obsidian settings (empty-state button). */
-	openSettings() {
+	openSettings(opts?: { scrollToPro?: boolean }) {
 		const setting = (this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } }).setting;
 		if (!setting) return;
 		setting.open();
 		setting.openTabById(this.manifest.id);
+		if (opts?.scrollToPro) this.settingTab?.scheduleScrollToPro();
 	}
 
 	/** Re-render visible blocks, e.g. after settings change (the folder/format may differ). */

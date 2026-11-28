@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Setting, setDeclarative, mockEnv } from 'obsidian';
 import { StreakwiseSettingTab } from '../src/settings';
+import { PRO_LEARN_MORE_TEXT, PRO_LEARN_MORE_URL, findProScrollTarget, scrollProSectionIntoView } from '../src/ui/proScroll';
+import { FakeEl } from './mocks/obsidian';
 import { EMPTY_LICENSE } from '../src/license/types';
 import type { HttpGetJson } from '../src/license/checkout';
 
@@ -234,5 +236,76 @@ test('consent: Buy handler refuses until the box is checked; state resets when s
 		assert.equal(t.openCheckout!(), false);
 	} finally {
 		(globalThis as { window?: unknown }).window = origOpen;
+	}
+});
+
+test('0.3.2: free Status row has a Learn more link to the landing #pro anchor', () => {
+	setDeclarative(true);
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+	const status = proDefs(tab).find((d) => d.name === 'Status');
+	assert.ok(status?.render);
+	const st = new Setting();
+	status.render(st);
+	const link = st.descEl.find((n) => n.hasClass('sw-pro-learn-more'));
+	assert.ok(link);
+	assert.equal(link.tag, 'a');
+	assert.equal(link.text, PRO_LEARN_MORE_TEXT);
+	assert.equal(link.getAttribute('href'), PRO_LEARN_MORE_URL);
+	assert.equal(PRO_LEARN_MORE_URL, 'https://formchime.com/streakwise/#pro');
+	assert.equal(link.getAttribute('target'), '_blank');
+	assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+});
+
+test('0.3.2: Pro users do not get a Learn more link on Status', () => {
+	setDeclarative(true);
+	const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }), true);
+	const status = proDefs(tab).find((d) => d.name === 'Status');
+	assert.equal(status?.render, undefined);
+});
+
+test('0.3.2: scroll prefers a visible consent block over Learn more', () => {
+	const root = new FakeEl();
+	const heading = root.createDiv({ cls: 'sw-pro-section' });
+	const status = root.createDiv({ cls: 'setting-item' });
+	status.createEl('a', { cls: 'sw-pro-learn-more', text: 'Learn more', attr: { href: PRO_LEARN_MORE_URL } });
+	const buy = root.createDiv({ cls: 'setting-item' });
+	const consent = buy.createDiv({ cls: 'sw-consent-block' });
+	assert.equal(findProScrollTarget(root), consent);
+	assert.equal(scrollProSectionIntoView(root), true);
+	assert.equal(consent.didScrollIntoView, true);
+	assert.equal(status.querySelector('a.sw-pro-learn-more')?.didScrollIntoView, false);
+	assert.equal(heading.didScrollIntoView, false);
+});
+
+test('0.3.2: when the consent row is hidden, scroll to the Learn more row', () => {
+	const root = new FakeEl();
+	root.createDiv({ cls: 'sw-pro-section' });
+	const status = root.createDiv({ cls: 'setting-item' });
+	status.createEl('a', { cls: 'sw-pro-learn-more', text: 'Learn more', attr: { href: PRO_LEARN_MORE_URL } });
+	const buy = root.createDiv({ cls: 'setting-item' });
+	buy.hide();
+	buy.createDiv({ cls: 'sw-consent-block' });
+	assert.equal(findProScrollTarget(root), status);
+	assert.equal(scrollProSectionIntoView(root), true);
+	assert.equal(status.didScrollIntoView, true);
+});
+
+test('0.3.2: legacy display marks the Pro license heading and still draws Learn more; Buy text and price unchanged', () => {
+	setDeclarative(false);
+	try {
+		const tab = makeTab(async () => ({ status: 200, json: { blocked: false } }));
+		Setting.created.length = 0;
+		tab.display();
+		const heading = Setting.created.find((s) => s.name === 'Pro license');
+		assert.ok(heading?.settingEl.hasClass('sw-pro-section'));
+		const status = Setting.created.find((s) => s.name === 'Status');
+		const link = status?.descEl.find((n) => n.hasClass('sw-pro-learn-more'));
+		assert.equal(link?.getAttribute('href'), PRO_LEARN_MORE_URL);
+		const buy = Setting.created.find((s) => s.name === 'Get Streakwise Pro');
+		assert.ok(buy);
+		const button = (buy.infoEl ?? buy.settingEl).find((n) => n.hasClass('sw-buy-button'));
+		assert.equal(button?.text, 'Buy Pro – US$12');
+	} finally {
+		setDeclarative(true);
 	}
 });

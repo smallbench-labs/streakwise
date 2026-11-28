@@ -46,6 +46,21 @@ export class FakeNode {
 	addClass(c: string) { this.classes.add(c); }
 	removeClass(c: string) { this.classes.delete(c); }
 	hasClass(c: string) { return this.classes.has(c); }
+	didScrollIntoView = false;
+	scrollIntoView(_opts?: unknown) { this.didScrollIntoView = true; }
+	matchesSelector(sel: string): boolean {
+		if (sel.startsWith('.')) return sel.slice(1).split('.').every((c) => this.classes.has(c));
+		const [tag, ...cls] = sel.split('.').filter(Boolean);
+		if (tag && this.tag.toLowerCase() !== tag.toLowerCase()) return false;
+		return cls.every((c) => this.classes.has(c));
+	}
+	querySelector(sel: string): FakeNode | null { return this.find((n) => n.matchesSelector(sel)); }
+	closest(sel: string): FakeNode | null {
+		for (let n: FakeNode | null = this; n; n = n.parentElement) {
+			if (n.matchesSelector(sel)) return n;
+		}
+		return null;
+	}
 	focus() { focused = this; }
 	get textContent(): string { return this.text + this.children.map((c) => c.textContent).join(''); }
 	addEventListener(t: string, l: Listener) { (this.listeners[t] ??= []).push(l); }

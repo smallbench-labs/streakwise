@@ -171,7 +171,7 @@ export class HeatmapBlock extends MarkdownRenderChild {
 		// One quiet, dismissible line on what Pro adds; never in the free-only build, never next to a Pro card.
 		if (!FREE_BUILD && shouldShowProHint({ isPro, proSoon, dismissed: s.proHintDismissed, proCardShown: !!lockedRule, hasErrors: parsed.errors.length > 0 })) {
 			renderProHint(root, {
-				open: () => plugin.openSettings(),
+				open: () => plugin.openSettings({ scrollToPro: true }),
 				dismiss: () => { void this.dismissProHint(); },
 			}, (el, name) => setIcon(el, name));
 		}
